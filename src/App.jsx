@@ -60,9 +60,82 @@ const INIT_TASKS = [
   { id:uid(), title:"Запустить проект",     period:"year",  done:false, xp:600, dueDate:today, recurring:false, recurType:"" },
 ];
 const INIT_EVENTS = [
-  { id:uid(), title:"ДР Алексея",       date:today, recurring:true,  recurType:"year", isBirthday:true,  color:T.gold },
-  { id:uid(), title:"Созвон с командой",date:today, recurring:true,  recurType:"week", isBirthday:false, color:T.sky  },
-  { id:uid(), title:"Дедлайн проекта",  date:today, recurring:false, recurType:"",     isBirthday:false, color:T.rose },
+  { id:uid(), title:"ДР Алексея",       date:today, recurring:true,  recurType:"year", isBirthday:true,  color:T.gold, eventType:"birthday" },
+  { id:uid(), title:"Созвон с командой",date:today, recurring:true,  recurType:"week", isBirthday:false, color:T.sky,  eventType:"meeting"  },
+  { id:uid(), title:"Дедлайн проекта",  date:today, recurring:false, recurType:"",     isBirthday:false, color:T.rose, eventType:"deadline" },
+];
+
+// ─── EVENT TYPES ──────────────────────────────────────────────────
+const EVENT_TYPES = [
+  {
+    id:"birthday", icon:"🎂", label:"День рождения", color:T.gold,
+    hint:"Задача «Поздравить» создастся автоматически и будет повторяться ежегодно.",
+    hintColor:T.gold,
+    defaultRec:true, defaultRecType:"year", isSystemBd:true,
+    makeTasks:(title)=>[{
+      title:`🎂 Поздравить с ДР: ${bdName(title)}`,
+      period:"day", xp:15, recurring:true, recurType:"year",
+    }],
+  },
+  {
+    id:"meeting", icon:"🤝", label:"Встреча", color:T.sky,
+    hint:"В делах на день встречи появится задача «Провести встречу».",
+    hintColor:T.sky,
+    defaultRec:false, defaultRecType:"week",
+    makeTasks:(title)=>[{
+      title:`🤝 Провести встречу: ${title}`,
+      period:"day", xp:20, recurring:false, recurType:"",
+    }],
+  },
+  {
+    id:"trip", icon:"✈️", label:"Поездка", color:T.teal,
+    hint:"Создадутся три задачи-шаблона: билеты, багаж и жильё.",
+    hintColor:T.teal,
+    defaultRec:false, defaultRecType:"",
+    makeTasks:(title, date)=>[
+      { title:`✈️ Купить билеты: ${title}`,        period:"day", xp:30, recurring:false, recurType:"", dueDate:date },
+      { title:`🧳 Упаковать чемодан: ${title}`,    period:"day", xp:20, recurring:false, recurType:"", dueDate:date },
+      { title:`🏨 Проверить бронирование: ${title}`,period:"day", xp:20, recurring:false, recurType:"", dueDate:date },
+    ],
+  },
+  {
+    id:"deadline", icon:"⏰", label:"Дедлайн", color:T.rose,
+    hint:"Задача «Сдать» появится в делах на дату дедлайна.",
+    hintColor:T.rose,
+    defaultRec:false, defaultRecType:"",
+    makeTasks:(title)=>[{
+      title:`⏰ Сдать: ${title}`,
+      period:"day", xp:40, recurring:false, recurType:"",
+    }],
+  },
+  {
+    id:"holiday", icon:"🎉", label:"Праздник", color:T.purpL,
+    hint:"В этот день появится задача «Отдыхать и наслаждаться!».",
+    hintColor:T.purpL,
+    defaultRec:true, defaultRecType:"year",
+    makeTasks:(title)=>[{
+      title:`🎉 ${title} — отдыхать и наслаждаться!`,
+      period:"day", xp:10, recurring:true, recurType:"year",
+    }],
+  },
+  {
+    id:"health", icon:"🏥", label:"Здоровье", color:"#34D399",
+    hint:"Появится задача-напоминание о визите или мероприятии.",
+    hintColor:"#34D399",
+    defaultRec:false, defaultRecType:"",
+    makeTasks:(title)=>[{
+      title:`🏥 Визит/мероприятие: ${title}`,
+      period:"day", xp:25, recurring:false, recurType:"",
+    }],
+  },
+  {
+    id:"custom", icon:"📌", label:"Другое", color:T.sub,
+    hint:null,
+    defaultRec:false, defaultRecType:"week",
+    makeTasks:(title)=>[{
+      title, period:"day", xp:15, recurring:false, recurType:"",
+    }],
+  },
 ];
 
 // ─── RECURRING AUTO-SPAWN ─────────────────────────────────────────
@@ -75,10 +148,21 @@ const spawnRecurring = (tasks, events, day) => {
     if (ok && !next.some(x => x.title===t.title && x.dueDate===day))
       next.unshift({...t, id:uid(), done:false, dueDate:day});
   });
-  events.filter(e => e.isBirthday && e.date.slice(5)===day.slice(5)).forEach(ev => {
-    const title = `🎂 Поздравить с ДР: ${bdName(ev.title)}`;
-    if (!next.some(x => x.title===title && x.dueDate===day))
-      next.unshift({id:uid(),title,period:"day",done:false,xp:15,dueDate:day,recurring:true,recurType:"year"});
+  // Spawn tasks from recurring calendar events using EVENT_TYPES templates
+  events.filter(e => e.recurring).forEach(ev => {
+    const [,em,ed] = ev.date.split("-").map(Number);
+    const [,dm,dd] = day.split("-").map(Number);
+    const ok = ev.recurType==="day"
+      || (ev.recurType==="week" && new Date(ev.date).getDay()===new Date(day).getDay())
+      || (ev.recurType==="year" && em===dm && ed===dd);
+    if (!ok) return;
+    const evTypeDef = EVENT_TYPES.find(t=>t.id===ev.eventType) || EVENT_TYPES.find(t=>t.id==="custom");
+    const templates = evTypeDef.makeTasks(ev.title, day);
+    templates.forEach(tmpl => {
+      if (!next.some(x => x.title===tmpl.title && x.dueDate===day))
+        next.unshift({id:uid(), done:false, period:"day", xp:tmpl.xp||15,
+          dueDate:day, recurring:true, recurType:ev.recurType, ...tmpl});
+    });
   });
   return next;
 };
@@ -139,9 +223,21 @@ function ModalOverlay({ onClose, children }) {
         width:"100%",maxWidth:420,
         border:`1px solid ${T.brd}`,borderBottom:"none",
         animation:"slideUp 0.32s cubic-bezier(.34,1.56,.64,1)",
-        maxHeight:"90vh",overflowY:"auto",
+        maxHeight:"90vh",overflowY:"auto",position:"relative",
       }}>
         <div style={{width:40,height:4,borderRadius:2,background:T.brd,margin:"8px auto 16px"}}/>
+        {/* ✕ close button */}
+        <div onClick={onClose} style={{
+          position:"absolute",top:14,right:14,
+          width:30,height:30,borderRadius:8,
+          background:T.bg2,border:`1px solid ${T.brd}`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          cursor:"pointer",fontSize:16,color:T.sub,
+          transition:"all 0.15s",zIndex:10,
+        }}
+        onMouseEnter={e=>{e.currentTarget.style.background=T.bg3;e.currentTarget.style.color=T.text;}}
+        onMouseLeave={e=>{e.currentTarget.style.background=T.bg2;e.currentTarget.style.color=T.sub;}}
+        >✕</div>
         {children}
       </div>
     </div>
@@ -202,10 +298,19 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
   const [dueDate,  setDate]   = useState(existing?.dueDate  ?? today);
   const [recurring,setRec]    = useState(existing?.recurring ?? false);
   const [recurType,setRT]     = useState(existing?.recurType ?? "day");
+  const [bulkMode, setBulk]   = useState(false);
+  const [bulkText, setBulkText] = useState("");
 
   const submit = () => {
-    if (!title.trim()) return;
     const p = PERIODS.find(x=>x.id===period);
+    if (bulkMode && !isEdit) {
+      const lines = bulkText.split("\n").map(l=>l.trim()).filter(Boolean);
+      if (!lines.length) return;
+      lines.forEach(line => onSave({ id:uid(), title:line, period, done:false, xp:p.xp, dueDate, recurring, recurType }));
+      onClose();
+      return;
+    }
+    if (!title.trim()) return;
     onSave({ id:existing?.id??uid(), title:title.trim(), period, done:existing?.done??false, xp:p.xp, dueDate, recurring, recurType });
     onClose();
   };
@@ -216,10 +321,47 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
         {isEdit?"✏️ Редактировать квест":"⚔️ Новый квест"}
       </h3>
 
+      {/* Bulk / Single mode tabs (only on create) */}
+      {!isEdit && (
+        <div style={{display:"flex",gap:6,marginBottom:14,background:T.bg0,borderRadius:11,padding:4,border:`1px solid ${T.brd}`}}>
+          {[["single","⚡ Одна задача"],["bulk","📋 Список"]].map(([mode,label])=>(
+            <div key={mode} onClick={()=>setBulk(mode==="bulk")} style={{
+              flex:1,padding:"8px 0",borderRadius:8,textAlign:"center",
+              fontSize:13,fontWeight:700,cursor:"pointer",
+              background:bulkMode===(mode==="bulk")?T.purp:"transparent",
+              color:bulkMode===(mode==="bulk")?"#fff":T.sub,
+              transition:"all 0.2s",
+            }}>{label}</div>
+          ))}
+        </div>
+      )}
+
       <div style={{marginBottom:14}}>
-        <SectionLabel>Название задачи</SectionLabel>
-        <StyledInput value={title} onChange={e=>setTitle(e.target.value)}
-          placeholder="Введите задачу..." autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
+        <SectionLabel>{bulkMode&&!isEdit?"Задачи (каждая строка — новое дело)":"Название задачи"}</SectionLabel>
+        {bulkMode && !isEdit ? (
+          <textarea
+            value={bulkText}
+            onChange={e=>setBulkText(e.target.value)}
+            placeholder={"Утренняя зарядка\nПрочитать 20 страниц\nОтправить отчёт..."}
+            autoFocus
+            rows={5}
+            style={{
+              width:"100%",padding:"11px 14px",background:T.bg0,
+              border:`1px solid ${T.purp}`,borderRadius:11,
+              color:T.text,fontSize:15,outline:"none",resize:"vertical",
+              colorScheme:"dark",fontFamily:"inherit",lineHeight:1.6,
+              minHeight:120,
+            }}
+          />
+        ) : (
+          <StyledInput value={title} onChange={e=>setTitle(e.target.value)}
+            placeholder="Введите задачу..." autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
+        )}
+        {bulkMode && !isEdit && bulkText.trim() && (
+          <div style={{fontSize:11,color:T.teal,marginTop:6,fontWeight:600}}>
+            ✓ Будет создано задач: {bulkText.split("\n").filter(l=>l.trim()).length}
+          </div>
+        )}
       </div>
 
       <div style={{marginBottom:14}}>
@@ -253,8 +395,8 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
 
       <div style={{display:"flex",gap:10}}>
         <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
-        <Btn variant="primary" onClick={submit} style={{flex:2}} disabled={!title.trim()}>
-          {isEdit?"Сохранить ✓":"Создать квест ⚡"}
+        <Btn variant="primary" onClick={submit} style={{flex:2}} disabled={bulkMode&&!isEdit ? !bulkText.trim() : !title.trim()}>
+          {isEdit?"Сохранить ✓":bulkMode?"Создать квесты ⚡":"Создать квест ⚡"}
         </Btn>
       </div>
       {isEdit && onDelete && (
@@ -268,48 +410,129 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
 
 // ─── EVENT MODAL ──────────────────────────────────────────────────
 function EventModal({ onClose, onCreate, defaultDate }) {
-  const [title, setTitle] = useState("");
-  const [date,  setDate]  = useState(defaultDate||today);
-  const [rec,   setRec]   = useState(false);
-  const [rt,    setRT]    = useState("year");
-  const [color, setColor] = useState(T.sky);
-  const isBd = isBdTitle(title);
-  const colors = [T.sky, T.purpL, T.teal, T.gold, T.rose];
+  const [step,   setStep]  = useState("type"); // "type" | "details"
+  const [typeId, setTypeId]= useState(null);
+  const [title,  setTitle] = useState("");
+  const [date,   setDate]  = useState(defaultDate||today);
+  const [rec,    setRec]   = useState(false);
+  const [rt,     setRT]    = useState("week");
+  const [color,  setColor] = useState(T.sky);
+
+  const evType = EVENT_TYPES.find(t=>t.id===typeId);
+
+  // When type selected — apply defaults
+  const pickType = (t) => {
+    setTypeId(t.id);
+    setRec(t.defaultRec);
+    setRT(t.defaultRecType||"week");
+    setColor(t.color);
+    setStep("details");
+  };
+
+  const isCustomColor = typeId==="custom";
 
   const submit = () => {
-    if (!title.trim()) return;
-    const ev = { id:uid(), title:title.trim(), date, recurring:rec||isBd, recurType:isBd?"year":rt, color:isBd?T.gold:color, isBirthday:isBd };
-    const bdTask = isBd ? { id:uid(), title:`🎂 Поздравить с ДР: ${bdName(title)}`, period:"day", done:false, xp:15, dueDate:date, recurring:true, recurType:"year" } : null;
-    onCreate(ev, bdTask);
+    if (!title.trim() || !evType) return;
+    const isBd = evType.id==="birthday";
+    const ev = {
+      id:uid(), title:title.trim(), date,
+      recurring: rec, recurType: rec ? rt : "",
+      color: evType.color,
+      isBirthday: isBd,
+      eventType: evType.id,
+    };
+    // Build auto-tasks
+    const rawTasks = evType.makeTasks(title.trim(), date);
+    const autoTasks = rawTasks.map(t=>({
+      id:uid(), done:false,
+      dueDate: t.dueDate || date,
+      recurring: rec && !["trip"].includes(evType.id),
+      recurType: rec && !["trip"].includes(evType.id) ? rt : "",
+      ...t,
+    }));
+    onCreate(ev, autoTasks);
     onClose();
   };
 
+  // ── Step 1: Choose type ──────────────────────────────────────────
+  if (step==="type") return (
+    <ModalOverlay onClose={onClose}>
+      <h3 style={{margin:"0 0 4px",fontSize:18,fontWeight:800,color:T.teal}}>📅 Новое событие</h3>
+      <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Выбери тип — оформим автоматически</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+        {EVENT_TYPES.map(t=>(
+          <div key={t.id} onClick={()=>pickType(t)} style={{
+            background:`linear-gradient(135deg,${t.color}18,${t.color}08)`,
+            border:`1.5px solid ${t.color}44`,
+            borderRadius:14, padding:"13px 14px",
+            cursor:"pointer", transition:"all 0.15s",
+            display:"flex", flexDirection:"column", gap:4,
+          }}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=t.color}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=t.color+"44"}
+          >
+            <span style={{fontSize:22,lineHeight:1}}>{t.icon}</span>
+            <span style={{fontSize:13,fontWeight:700,color:t.color,lineHeight:1.2}}>{t.label}</span>
+          </div>
+        ))}
+      </div>
+    </ModalOverlay>
+  );
+
+  // ── Step 2: Fill details ─────────────────────────────────────────
+  const previewTasks = evType && title.trim() ? evType.makeTasks(title.trim(), date) : [];
+
   return (
     <ModalOverlay onClose={onClose}>
-      <h3 style={{margin:"0 0 18px",fontSize:18,fontWeight:800,color:T.teal}}>📅 Новое событие</h3>
+      {/* Header with back */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+        <div onClick={()=>setStep("type")} style={{
+          width:30,height:30,borderRadius:8,background:T.bg2,border:`1px solid ${T.brd}`,
+          display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14,color:T.sub,flexShrink:0,
+        }}>‹</div>
+        <h3 style={{margin:0,fontSize:17,fontWeight:800,color:evType?.color||T.teal}}>
+          {evType?.icon} {evType?.label}
+        </h3>
+      </div>
 
-      {isBd && (
-        <div style={{background:T.gold+"22",border:`1px solid ${T.gold}55`,borderRadius:11,padding:"10px 14px",marginBottom:14,fontSize:13,color:T.gold,lineHeight:1.5}}>
-          🎂 Обнаружен день рождения! Задача «Поздравить» создастся автоматически и будет повторяться ежегодно.
+      {/* Hint banner */}
+      {evType?.hint && (
+        <div style={{
+          background:evType.hintColor+"15",border:`1px solid ${evType.hintColor}44`,
+          borderRadius:11,padding:"9px 13px",marginBottom:14,fontSize:12.5,
+          color:evType.hintColor,lineHeight:1.5,
+        }}>
+          {evType.hint}
         </div>
       )}
 
+      {/* Title */}
       <div style={{marginBottom:14}}>
-        <SectionLabel>Название события</SectionLabel>
+        <SectionLabel>Название</SectionLabel>
         <StyledInput value={title} onChange={e=>setTitle(e.target.value)}
-          placeholder="ДР Алексея, встреча с другом..." autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
+          placeholder={
+            evType?.id==="birthday" ? "ДР Алексея…" :
+            evType?.id==="meeting"  ? "Встреча с командой…" :
+            evType?.id==="trip"     ? "Поездка в Барселону…" :
+            evType?.id==="deadline" ? "Отчёт Q2…" :
+            evType?.id==="holiday"  ? "Новый год…" :
+            evType?.id==="health"   ? "Приём у врача…" : "Название события…"
+          }
+          autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
       </div>
 
+      {/* Date */}
       <div style={{marginBottom:14}}>
         <SectionLabel>Дата</SectionLabel>
         <StyledInput type="date" value={date} onChange={e=>setDate(e.target.value)}/>
       </div>
 
-      {!isBd && <>
+      {/* Color picker — only for "custom" type */}
+      {isCustomColor && (
         <div style={{marginBottom:12}}>
           <SectionLabel>Цвет метки</SectionLabel>
           <div style={{display:"flex",gap:10}}>
-            {colors.map(c=>(
+            {[T.sky, T.purpL, T.teal, T.gold, T.rose].map(c=>(
               <div key={c} onClick={()=>setColor(c)} style={{
                 width:28,height:28,borderRadius:"50%",background:c,cursor:"pointer",
                 border:`3px solid ${color===c?"#fff":"transparent"}`,
@@ -318,18 +541,42 @@ function EventModal({ onClose, onCreate, defaultDate }) {
             ))}
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-          marginBottom:rec?10:18,background:T.bg0,padding:"11px 14px",borderRadius:11,border:`1px solid ${T.brd}`}}>
-          <span style={{fontSize:14,color:T.text}}>🔄 Повторение</span>
-          <Toggle value={rec} onChange={setRec}/>
+      )}
+
+      {/* Repeat — hide for birthday (always yearly) and trip (no repeat) */}
+      {!["birthday","trip"].includes(typeId) && (
+        <>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+            marginBottom:rec?10:14,background:T.bg0,padding:"11px 14px",borderRadius:11,border:`1px solid ${T.brd}`}}>
+            <span style={{fontSize:14,color:T.text}}>🔄 Повторение</span>
+            <Toggle value={rec} onChange={setRec}/>
+          </div>
+          {rec && <div style={{marginBottom:14}}><RecurPicker value={rt} onChange={setRT} accentC={evType?.color||T.teal} accentL={evType?.color||T.teal}/></div>}
+        </>
+      )}
+
+      {/* Preview of auto-tasks */}
+      {previewTasks.length > 0 && (
+        <div style={{
+          background:T.bg0,border:`1px solid ${T.brd}`,borderRadius:11,
+          padding:"10px 13px",marginBottom:16,
+        }}>
+          <div style={{fontSize:11,fontWeight:700,color:T.sub,letterSpacing:"0.06em",marginBottom:7,textTransform:"uppercase"}}>
+            Автозадачи на {date===today?"сегодня":fmtDate(date)}
+          </div>
+          {previewTasks.map((t,i)=>(
+            <div key={i} style={{fontSize:13,color:T.text,padding:"3px 0",borderBottom:i<previewTasks.length-1?`1px solid ${T.brd}`:"none"}}>
+              {t.title}
+            </div>
+          ))}
         </div>
-        {rec && <div style={{marginBottom:18}}><RecurPicker value={rt} onChange={setRT} accentC={T.teal} accentL={T.teal}/></div>}
-      </>}
-      {isBd && <div style={{marginBottom:18}}/>}
+      )}
 
       <div style={{display:"flex",gap:10}}>
         <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
-        <Btn variant="teal"  onClick={submit}  style={{flex:2}} disabled={!title.trim()}>Добавить ✨</Btn>
+        <Btn onClick={submit} style={{flex:2,background:`linear-gradient(135deg,${evType?.color||T.teal},${evType?.color||T.teal}99)`,color:"#07071C",fontWeight:800,border:"none",opacity:title.trim()?1:0.5}} disabled={!title.trim()}>
+          Добавить ✨
+        </Btn>
       </div>
     </ModalOverlay>
   );
@@ -390,7 +637,7 @@ function TaskCard({ task, onToggle, onEdit }) {
 }
 
 // ─── TASKS SCREEN ─────────────────────────────────────────────────
-function TasksScreen({ tasks, onToggle, onSave, onDelete }) {
+function TasksScreen({ tasks, onToggle, onSave, onDelete, xp }) {
   const [filter,setFilter]   = useState("day");
   const [showCreate,setCreate] = useState(false);
   const [editTask,setEdit]   = useState(null);
@@ -406,11 +653,11 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete }) {
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
 
       {/* Period filter tabs */}
-      <div style={{display:"flex",gap:6,padding:"14px 16px 10px",overflowX:"auto",scrollbarWidth:"none"}}>
+      <div style={{display:"flex",gap:5,padding:"14px 16px 10px"}}>
         {PERIODS.map(pd=>(
           <div key={pd.id} onClick={()=>setFilter(pd.id)} style={{
-            padding:"7px 14px",borderRadius:20,cursor:"pointer",whiteSpace:"nowrap",
-            fontWeight:700,fontSize:13,flexShrink:0,
+            flex:1,padding:"7px 2px",borderRadius:20,cursor:"pointer",
+            fontWeight:700,fontSize:12,textAlign:"center",whiteSpace:"nowrap",
             background:filter===pd.id?pd.accent:T.bg2,
             color:filter===pd.id?(pd.id==="month"?"#fff":"#000"):T.sub,
             border:`1px solid ${filter===pd.id?pd.accent:T.brd}`,
@@ -459,6 +706,26 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete }) {
         <div style={{height:100}}/>
       </div>
 
+      {/* Mini header bar at bottom of Квесты tab */}
+      <div style={{
+        padding:"8px 16px",background:T.bg1,borderTop:`1px solid ${T.brd}`,flexShrink:0,
+      }}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:900,letterSpacing:"-0.03em"}}>
+              <span style={{color:T.gold}}>Q</span><span style={{color:T.text}}>uestly</span>
+              <span style={{fontSize:10,color:T.sub,fontWeight:400,marginLeft:6,letterSpacing:"0.04em"}}>RPG-трекер задач</span>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:11,color:T.sub}}>Ур.{lvlOf(xp)}</span>
+            <span style={{fontSize:12,fontWeight:800,color:T.purpL}}>{RANK_ICONS[Math.min(lvlOf(xp)-1,RANK_ICONS.length-1)]} {RANKS[Math.min(lvlOf(xp)-1,RANKS.length-1)]}</span>
+            <span style={{fontSize:11,color:T.gold,fontWeight:700}}>⚡ {xp.toLocaleString()} XP</span>
+          </div>
+        </div>
+        <XPBar progress={progOf(xp)} height={3}/>
+      </div>
+
       {/* FAB — correctly positioned inside relative parent */}
       <div style={{position:"absolute",bottom:16,right:16,zIndex:10}}>
         <div onClick={()=>setCreate(true)} style={{
@@ -503,10 +770,10 @@ function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
 
   return (
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:6}}>
-        {WDAYS.map(d=><div key={d} style={{textAlign:"center",fontSize:11,color:T.sub,fontWeight:700,padding:"4px 0"}}>{d}</div>)}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:3}}>
+        {WDAYS.map(d=><div key={d} style={{textAlign:"center",fontSize:10,color:T.sub,fontWeight:700,padding:"2px 0"}}>{d}</div>)}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
         {cells.map((day,i) => {
           if (!day) return <div key={`e${i}`}/>;
           const isToday = isThisMonth && day===tD;
@@ -518,19 +785,19 @@ function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
             <div key={day} onClick={()=>{
               onSelect(`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`);
             }} style={{
-              aspectRatio:"1",borderRadius:9,cursor:"pointer",
+              height:38,borderRadius:8,cursor:"pointer",
               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
               background:isSel?T.purp:isToday?T.bg3:"transparent",
               border:isToday&&!isSel?`1.5px solid ${T.purp}`:"1.5px solid transparent",
               transition:"all 0.15s",
             }}>
               <span style={{
-                fontSize:13,fontWeight:isToday?800:400,lineHeight:1,
+                fontSize:12,fontWeight:isToday?800:400,lineHeight:1,
                 color:isSel?"#fff":isToday?T.purpL:hasBd?T.gold:T.text,
               }}>{day}</span>
               {colors.length>0 && (
-                <div style={{display:"flex",gap:2,marginTop:3}}>
-                  {colors.map((c,ci)=><div key={ci} style={{width:4,height:4,borderRadius:"50%",background:c}}/>)}
+                <div style={{display:"flex",gap:2,marginTop:2}}>
+                  {colors.map((c,ci)=><div key={ci} style={{width:3,height:3,borderRadius:"50%",background:c}}/>)}
                 </div>
               )}
             </div>
@@ -564,13 +831,13 @@ function CalendarScreen({ events, tasks, onAddEvent }) {
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px 10px"}}>
-        <div onClick={prev} style={{width:36,height:36,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:T.sub}}>‹</div>
-        <div style={{fontWeight:800,fontSize:18,color:T.text}}>{MONTHS_RU[month]} {year}</div>
-        <div onClick={next} style={{width:36,height:36,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:T.sub}}>›</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px 6px"}}>
+        <div onClick={prev} style={{width:32,height:32,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:T.sub}}>‹</div>
+        <div style={{fontWeight:800,fontSize:16,color:T.text}}>{MONTHS_RU[month]} {year}</div>
+        <div onClick={next} style={{width:32,height:32,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:T.sub}}>›</div>
       </div>
 
-      <div style={{padding:"0 14px 12px"}}>
+      <div style={{padding:"0 12px 8px"}}>
         <CalendarGrid year={year} month={month} events={events} selectedDate={selDate} onSelect={setSel}/>
       </div>
 
@@ -600,7 +867,7 @@ function CalendarScreen({ events, tasks, onAddEvent }) {
                 borderRadius:11,padding:"11px 14px",marginBottom:8,
                 display:"flex",alignItems:"center",gap:10,
               }}>
-                <span style={{fontSize:20}}>{ev.isBirthday?"🎂":"📌"}</span>
+                <span style={{fontSize:20}}>{(()=>{const t=EVENT_TYPES.find(t=>t.id===ev.eventType);return t?t.icon:"📌";})()}</span>
                 <div style={{flex:1}}>
                   <div style={{fontSize:14,fontWeight:600,color:T.text}}>{ev.title}</div>
                   <div style={{fontSize:11,color:T.sub,marginTop:2}}>
@@ -793,7 +1060,10 @@ export default function App() {
   },[]);
 
   const handleDelete   = useCallback(id => setTasks(p=>p.filter(t=>t.id!==id)),[]);
-  const handleAddEvent = useCallback((ev,bdTask)=>{ if(ev)setEvts(p=>[ev,...p]); if(bdTask)setTasks(p=>[bdTask,...p]); },[]);
+  const handleAddEvent = useCallback((ev, autoTasks)=>{
+    if(ev) setEvts(p=>[ev,...p]);
+    if(autoTasks?.length) setTasks(p=>[...autoTasks,...p]);
+  },[]);
 
   const TABS = [
     {id:"tasks",    label:"Квесты",    icon:"⚔️"},
@@ -841,32 +1111,12 @@ export default function App() {
         </div>
       )}
 
-      {/* Header */}
-      <div style={{
-        padding:`calc(14px + env(safe-area-inset-top,0px)) 16px 12px`,
-        background:T.bg1,borderBottom:`1px solid ${T.brd}`,flexShrink:0,
-      }}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-          <div>
-            <div style={{fontSize:20,fontWeight:900,letterSpacing:"-0.03em"}}>
-              <span style={{color:T.gold}}>Q</span><span style={{color:T.text}}>uestly</span>
-            </div>
-            <div style={{fontSize:11,color:T.sub,letterSpacing:"0.05em"}}>RPG-трекер задач</div>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"flex-end",marginBottom:4}}>
-              <span style={{fontSize:11,color:T.sub}}>Ур.{level}</span>
-              <span style={{fontSize:13,fontWeight:800,color:T.purpL}}>{RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)]} {RANKS[Math.min(level-1,RANKS.length-1)]}</span>
-            </div>
-            <span style={{fontSize:11,color:T.gold,fontWeight:700}}>⚡ {xp.toLocaleString()} XP</span>
-          </div>
-        </div>
-        <XPBar progress={progOf(xp)} height={5}/>
-      </div>
+      {/* Safe area top spacer */}
+      <div style={{height:"env(safe-area-inset-top,0px)",background:T.bg0,flexShrink:0}}/>
 
       {/* Screen */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
-        {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete}/>}
+        {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete} xp={xp}/>}
         {tab==="calendar" && <CalendarScreen events={events} tasks={tasks}           onAddEvent={handleAddEvent}/>}
         {tab==="profile"  && <ProfileScreen  xp={xp}        tasks={tasks}           events={events}/>}
       </div>
