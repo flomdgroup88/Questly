@@ -1172,7 +1172,7 @@ function ProfileScreen({ xp, tasks, events }) {
 // ─── SHARE SHEET ─────────────────────────────────────────────────
 function ShareSheet({ code, title, onClose }) {
   const [copied,setCopied]=useState(false);
-  const link = `https://t.me/questly_bot?start=${code}`;
+  const link = `https://t.me/questlytaskbot?start=${code}`;
   const copy = () => { navigator.clipboard?.writeText(link).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); };
   return (
     <ModalOverlay onClose={onClose}>
