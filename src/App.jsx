@@ -640,18 +640,30 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete }) {
     // ✅ FIX: position:relative so the FAB absolute-positions correctly
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
 
-      {/* Period filter tabs */}
-      <div style={{display:"flex",gap:6,padding:"14px 16px 10px",overflowX:"auto",scrollbarWidth:"none"}}>
-        {PERIODS.map(pd=>(
-          <div key={pd.id} onClick={()=>setFilter(pd.id)} style={{
-            padding:"7px 14px",borderRadius:20,cursor:"pointer",whiteSpace:"nowrap",
-            fontWeight:700,fontSize:13,flexShrink:0,
-            background:filter===pd.id?pd.accent:T.bg2,
-            color:filter===pd.id?(pd.id==="month"?"#fff":"#000"):T.sub,
-            border:`1px solid ${filter===pd.id?pd.accent:T.brd}`,
-            transition:"all 0.2s",boxShadow:filter===pd.id?`0 2px 12px ${pd.accent}55`:"none",
-          }}>{pd.icon} {pd.label}</div>
-        ))}
+      {/* Period filter tabs — segmented control */}
+      <div style={{padding:"12px 16px 8px",flexShrink:0}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,background:T.bg2,borderRadius:14,padding:4,border:`1px solid ${T.brd}`}}>
+          {PERIODS.map(pd=>{
+            const active = filter===pd.id;
+            return (
+              <div key={pd.id} onClick={()=>setFilter(pd.id)} style={{
+                borderRadius:10,cursor:"pointer",
+                padding:"8px 4px",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+                background:active?pd.accent:"transparent",
+                boxShadow:active?`0 2px 8px ${pd.accent}55`:"none",
+                transition:"all 0.2s cubic-bezier(.34,1.56,.64,1)",
+              }}>
+                <span style={{fontSize:15,lineHeight:1}}>{pd.icon}</span>
+                <span style={{
+                  fontSize:11,fontWeight:700,letterSpacing:"0.01em",
+                  color:active?(pd.id==="month"?"#fff":"#000"):T.sub,
+                  transition:"color 0.2s",
+                }}>{pd.label}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Progress banner */}
