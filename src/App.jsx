@@ -397,14 +397,15 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
 }
 
 // ─── EVENT MODAL ──────────────────────────────────────────────────
-function EventModal({ onClose, onCreate, defaultDate }) {
-  const [step,   setStep]  = useState("type"); // "type" | "details"
-  const [typeId, setTypeId]= useState(null);
-  const [title,  setTitle] = useState("");
-  const [date,   setDate]  = useState(defaultDate||today);
-  const [rec,    setRec]   = useState(false);
-  const [rt,     setRT]    = useState("week");
-  const [color,  setColor] = useState(T.sky);
+function EventModal({ onClose, onCreate, onUpdate, onDelete, defaultDate, existing }) {
+  const isEdit = !!existing;
+  const [step,   setStep]  = useState(isEdit ? "details" : "type");
+  const [typeId, setTypeId]= useState(existing?.eventType || null);
+  const [title,  setTitle] = useState(existing?.title || "");
+  const [date,   setDate]  = useState(existing?.date || defaultDate||today);
+  const [rec,    setRec]   = useState(existing?.recurring || false);
+  const [rt,     setRT]    = useState(existing?.recurType || "week");
+  const [color,  setColor] = useState(existing?.color || T.sky);
 
   const evType = EVENT_TYPES.find(t=>t.id===typeId);
 
@@ -423,12 +424,17 @@ function EventModal({ onClose, onCreate, defaultDate }) {
     if (!title.trim() || !evType) return;
     const isBd = evType.id==="birthday";
     const ev = {
-      id:uid(), title:title.trim(), date,
+      id: existing?.id || uid(), title:title.trim(), date,
       recurring: rec, recurType: rec ? rt : "",
       color: evType.color,
       isBirthday: isBd,
       eventType: evType.id,
     };
+    if (isEdit) {
+      onUpdate(ev);
+      onClose();
+      return;
+    }
     // Build auto-tasks
     const rawTasks = evType.makeTasks(title.trim(), date);
     const autoTasks = rawTasks.map(t=>({
@@ -445,7 +451,7 @@ function EventModal({ onClose, onCreate, defaultDate }) {
   // ── Step 1: Choose type ──────────────────────────────────────────
   if (step==="type") return (
     <ModalOverlay onClose={onClose}>
-      <h3 style={{margin:"0 0 4px",fontSize:18,fontWeight:800,color:T.teal}}>📅 Новое событие</h3>
+      <h3 style={{margin:"0 0 4px",fontSize:18,fontWeight:800,color:T.teal}}>📅 {isEdit?"Изменить событие":"Новое событие"}</h3>
       <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Выбери тип — оформим автоматически</p>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
         {EVENT_TYPES.map(t=>(
@@ -474,12 +480,14 @@ function EventModal({ onClose, onCreate, defaultDate }) {
     <ModalOverlay onClose={onClose}>
       {/* Header with back */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-        <div onClick={()=>setStep("type")} style={{
-          width:30,height:30,borderRadius:8,background:T.bg2,border:`1px solid ${T.brd}`,
-          display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14,color:T.sub,flexShrink:0,
-        }}>‹</div>
-        <h3 style={{margin:0,fontSize:17,fontWeight:800,color:evType?.color||T.teal}}>
-          {evType?.icon} {evType?.label}
+        {!isEdit && (
+          <div onClick={()=>setStep("type")} style={{
+            width:30,height:30,borderRadius:8,background:T.bg2,border:`1px solid ${T.brd}`,
+            display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14,color:T.sub,flexShrink:0,
+          }}>‹</div>
+        )}
+        <h3 style={{margin:0,fontSize:17,fontWeight:800,color:evType?.color||T.teal,flex:1}}>
+          {isEdit?"✏️ Редактировать событие":`${evType?.icon} ${evType?.label}`}
         </h3>
       </div>
 
@@ -563,9 +571,14 @@ function EventModal({ onClose, onCreate, defaultDate }) {
       <div style={{display:"flex",gap:10}}>
         <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
         <Btn onClick={submit} style={{flex:2,background:`linear-gradient(135deg,${evType?.color||T.teal},${evType?.color||T.teal}99)`,color:"#07071C",fontWeight:800,border:"none",opacity:title.trim()?1:0.5}} disabled={!title.trim()}>
-          Добавить ✨
+          {isEdit?"Сохранить ✓":"Добавить ✨"}
         </Btn>
       </div>
+      {isEdit && onDelete && (
+        <Btn variant="ghost" onClick={()=>{onDelete(existing.id);onClose();}} style={{marginTop:8,width:"100%",color:T.rose,borderColor:T.rose+"55"}}>
+          🗑 Удалить событие
+        </Btn>
+      )}
     </ModalOverlay>
   );
 }
@@ -791,12 +804,13 @@ function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
 }
 
 // ─── CALENDAR SCREEN ──────────────────────────────────────────────
-function CalendarScreen({ events, tasks, onAddEvent }) {
+function CalendarScreen({ events, tasks, onAddEvent, onEditEvent, onDeleteEvent }) {
   const now=new Date();
   const [month,setMonth]   = useState(now.getMonth());
   const [year,setYear]     = useState(now.getFullYear());
   const [selDate,setSel]   = useState(today);
   const [showModal,setModal] = useState(false);
+  const [editEvent,setEditEvent] = useState(null);
 
   const prev = () => { if (month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1); };
   const next = () => { if (month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1); };
@@ -846,13 +860,17 @@ function CalendarScreen({ events, tasks, onAddEvent }) {
         ) : (
           <>
             {selEvents.map(ev=>(
-              <div key={ev.id} style={{
+              <div key={ev.id} onClick={()=>setEditEvent(ev)} style={{
                 background:`linear-gradient(135deg,${ev.color}18,${T.bg2})`,
                 border:`1px solid ${ev.color}55`,borderLeft:`4px solid ${ev.color}`,
                 borderRadius:12,padding:"13px 14px",marginBottom:9,
                 display:"flex",alignItems:"center",gap:12,
                 boxShadow:`0 2px 12px ${ev.color}22`,
-              }}>
+                cursor:"pointer",transition:"opacity 0.15s",
+              }}
+              onMouseEnter={e=>e.currentTarget.style.opacity="0.8"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}
+              >
                 <div style={{width:40,height:40,borderRadius:10,background:ev.color+"22",border:`1px solid ${ev.color}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
                   {(()=>{const t=EVENT_TYPES.find(t=>t.id===ev.eventType);return t?t.icon:"📌";})()}
                 </div>
@@ -862,6 +880,7 @@ function CalendarScreen({ events, tasks, onAddEvent }) {
                     {ev.recurring?`🔄 ${ev.recurType==="year"?"Ежегодно":ev.recurType==="week"?"Еженедельно":"Ежедневно"}`:"📌 Разовое"}
                   </div>
                 </div>
+                <div style={{fontSize:14,color:T.sub,flexShrink:0}}>✏️</div>
               </div>
             ))}
             {selTasks.length>0 && (
@@ -889,6 +908,7 @@ function CalendarScreen({ events, tasks, onAddEvent }) {
         <div style={{height:20}}/>
       </div>
       {showModal && <EventModal onClose={()=>setModal(false)} onCreate={onAddEvent} defaultDate={selDate}/>}
+      {editEvent && <EventModal existing={editEvent} onClose={()=>setEditEvent(null)} onUpdate={onEditEvent} onDelete={onDeleteEvent}/>}
     </div>
   );
 }
@@ -1053,6 +1073,8 @@ export default function App() {
     if(ev) setEvts(p=>[ev,...p]);
     if(autoTasks?.length) setTasks(p=>[...autoTasks,...p]);
   },[]);
+  const handleEditEvent   = useCallback(ev => setEvts(p=>{const i=p.findIndex(e=>e.id===ev.id);if(i===-1)return p;const u=[...p];u[i]={...p[i],...ev};return u;}),[]);
+  const handleDeleteEvent = useCallback(id => setEvts(p=>p.filter(e=>e.id!==id)),[]);
 
   const TABS = [
     {id:"tasks",    label:"Квесты",    icon:"⚔️"},
@@ -1128,7 +1150,7 @@ export default function App() {
       {/* Screen */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
         {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete}/>}
-        {tab==="calendar" && <CalendarScreen events={events} tasks={tasks}           onAddEvent={handleAddEvent}/>}
+        {tab==="calendar" && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent}/>}
         {tab==="profile"  && <ProfileScreen  xp={xp}        tasks={tasks}           events={events}/>}
       </div>
 
