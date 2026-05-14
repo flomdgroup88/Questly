@@ -691,16 +691,17 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete }) {
             )}
           </>
         )}
-        <div style={{height:100}}/>
+        <div style={{height:88}}/>
       </div>
 
       {/* FAB — correctly positioned inside relative parent */}
-      <div style={{position:"absolute",bottom:16,right:16,zIndex:10}}>
+      <div style={{position:"absolute",bottom:20,right:16,zIndex:10}}>
         <div onClick={()=>setCreate(true)} style={{
-          width:56,height:56,borderRadius:"50%",cursor:"pointer",
+          width:52,height:52,borderRadius:"50%",cursor:"pointer",
           background:`linear-gradient(135deg,${T.purp},${T.gold})`,
           display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:28,color:"#fff",boxShadow:`0 4px 20px ${T.purp}66`,
+          fontSize:26,color:"#fff",
+          boxShadow:`0 4px 20px ${T.purp}88, 0 0 0 4px ${T.bg0}`,
           transition:"transform 0.2s cubic-bezier(.34,1.56,.64,1)",
         }}>+</div>
       </div>
@@ -753,18 +754,19 @@ function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
             <div key={day} onClick={()=>{
               onSelect(`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`);
             }} style={{
-              aspectRatio:"1",borderRadius:9,cursor:"pointer",
+              aspectRatio:"1",borderRadius:8,cursor:"pointer",
               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
               background:isSel?T.purp:isToday?T.bg3:"transparent",
               border:isToday&&!isSel?`1.5px solid ${T.purp}`:"1.5px solid transparent",
               transition:"all 0.15s",
+              padding:"2px 0",
             }}>
               <span style={{
-                fontSize:13,fontWeight:isToday?800:400,lineHeight:1,
+                fontSize:12,fontWeight:isToday?800:400,lineHeight:1,
                 color:isSel?"#fff":isToday?T.purpL:hasBd?T.gold:T.text,
               }}>{day}</span>
               {colors.length>0 && (
-                <div style={{display:"flex",gap:2,marginTop:3}}>
+                <div style={{display:"flex",gap:2,marginTop:2}}>
                   {colors.map((c,ci)=><div key={ci} style={{width:4,height:4,borderRadius:"50%",background:c}}/>)}
                 </div>
               )}
@@ -799,13 +801,15 @@ function CalendarScreen({ events, tasks, onAddEvent }) {
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px 10px"}}>
-        <div onClick={prev} style={{width:36,height:36,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:T.sub}}>‹</div>
-        <div style={{fontWeight:800,fontSize:18,color:T.text}}>{MONTHS_RU[month]} {year}</div>
-        <div onClick={next} style={{width:36,height:36,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:T.sub}}>›</div>
+      {/* Calendar safe-area top padding since global header is hidden */}
+      <div style={{height:"calc(10px + env(safe-area-inset-top,0px))",background:T.bg1,flexShrink:0}}/>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 16px 8px",background:T.bg1,borderBottom:`1px solid ${T.brd}`,flexShrink:0}}>
+        <div onClick={prev} style={{width:32,height:32,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:T.sub}}>‹</div>
+        <div style={{fontWeight:800,fontSize:17,color:T.text}}>{MONTHS_RU[month]} {year}</div>
+        <div onClick={next} style={{width:32,height:32,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:T.sub}}>›</div>
       </div>
 
-      <div style={{padding:"0 14px 12px"}}>
+      <div style={{padding:"8px 12px 6px",flexShrink:0}}>
         <CalendarGrid year={year} month={month} events={events} selectedDate={selDate} onSelect={setSel}/>
       </div>
 
@@ -831,15 +835,19 @@ function CalendarScreen({ events, tasks, onAddEvent }) {
           <>
             {selEvents.map(ev=>(
               <div key={ev.id} style={{
-                background:T.bg2,border:`1px solid ${ev.color}44`,borderLeft:`4px solid ${ev.color}`,
-                borderRadius:11,padding:"11px 14px",marginBottom:8,
-                display:"flex",alignItems:"center",gap:10,
+                background:`linear-gradient(135deg,${ev.color}18,${T.bg2})`,
+                border:`1px solid ${ev.color}55`,borderLeft:`4px solid ${ev.color}`,
+                borderRadius:12,padding:"13px 14px",marginBottom:9,
+                display:"flex",alignItems:"center",gap:12,
+                boxShadow:`0 2px 12px ${ev.color}22`,
               }}>
-                <span style={{fontSize:20}}>{(()=>{const t=EVENT_TYPES.find(t=>t.id===ev.eventType);return t?t.icon:"📌";})()}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:14,fontWeight:600,color:T.text}}>{ev.title}</div>
-                  <div style={{fontSize:11,color:T.sub,marginTop:2}}>
-                    {ev.recurring?`🔄 ${ev.recurType==="year"?"Ежегодно":ev.recurType==="week"?"Еженедельно":"Ежедневно"}`:"Разовое"}
+                <div style={{width:40,height:40,borderRadius:10,background:ev.color+"22",border:`1px solid ${ev.color}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+                  {(()=>{const t=EVENT_TYPES.find(t=>t.id===ev.eventType);return t?t.icon:"📌";})()}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ev.title}</div>
+                  <div style={{fontSize:11,color:ev.color,marginTop:3,fontWeight:600}}>
+                    {ev.recurring?`🔄 ${ev.recurType==="year"?"Ежегодно":ev.recurType==="week"?"Еженедельно":"Ежедневно"}`:"📌 Разовое"}
                   </div>
                 </div>
               </div>
@@ -959,13 +967,14 @@ function ProfileScreen({ xp, tasks, events }) {
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           {ACHIEVEMENTS.map(a=>(
             <div key={a.label} style={{
-              background:a.done?T.gold+"22":T.bg3,
-              border:`1px solid ${a.done?T.gold+"55":T.brdDim}`,
-              borderRadius:11,padding:"12px",opacity:a.done?1:0.45,transition:"all 0.3s",
+              background:a.done?T.gold+"22":T.bg2,
+              border:`1px solid ${a.done?T.gold+"66":T.brd}`,
+              borderRadius:11,padding:"12px",transition:"all 0.3s",
             }}>
-              <div style={{fontSize:22,marginBottom:4}}>{a.icon}</div>
-              <div style={{fontSize:12,fontWeight:700,color:a.done?T.gold:T.sub}}>{a.label}</div>
-              <div style={{fontSize:10,color:T.dim,marginTop:2}}>{a.desc}</div>
+              <div style={{fontSize:22,marginBottom:4,filter:a.done?"none":"grayscale(0.5) opacity(0.6)"}}>{a.icon}</div>
+              <div style={{fontSize:12,fontWeight:700,color:a.done?T.gold:T.text}}>{a.label}</div>
+              <div style={{fontSize:10,color:a.done?T.goldDim:T.sub,marginTop:3,lineHeight:1.4}}>{a.desc}</div>
+              {!a.done && <div style={{fontSize:9,color:T.dim,marginTop:4,fontWeight:600,letterSpacing:"0.04em"}}>🔒 не открыто</div>}
             </div>
           ))}
         </div>
@@ -1079,7 +1088,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Header */}
+      {/* Header — hidden on calendar tab */}
+      {tab!=="calendar" && (
       <div style={{
         padding:`calc(14px + env(safe-area-inset-top,0px)) 16px 12px`,
         background:T.bg1,borderBottom:`1px solid ${T.brd}`,flexShrink:0,
@@ -1101,6 +1111,7 @@ export default function App() {
         </div>
         <XPBar progress={progOf(xp)} height={5}/>
       </div>
+      )}
 
       {/* Screen */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
