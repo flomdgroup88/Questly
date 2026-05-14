@@ -97,7 +97,7 @@ const INIT_SHARED_GOALS = [
     title:"Ужин в пятницу 🍷",
     emoji:"🛒",
     shareCode: mkCode(),
-    createdAt: today,
+    createdAt: todayStr(),
     participants:["Ты","Маша"],
     items:[
       {id:uid(),title:"Вино 🍷",        assignedTo:"Ты",   doneBy:"Ты",   done:true },
