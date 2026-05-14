@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { cloudSave, cloudFind, cloudAddParticipant } from "./firebase.js";
 
 // ─── TELEGRAM WEBAPP INIT ─────────────────────────────────────────
 const tg = typeof window !== "undefined" && window.Telegram?.WebApp;
@@ -1263,19 +1264,35 @@ function NewSharedGoalModal({ onClose, onCreate }) {
 
 // ─── JOIN BY CODE MODAL ───────────────────────────────────────────
 function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
-  const [code,setCode]=useState(""); const [result,setResult]=useState(null); const [err,setErr]=useState("");
-  const search=()=>{
+  const [code,setCode]=useState(""); const [result,setResult]=useState(null); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
+  const search=async()=>{
     const c=code.trim().toUpperCase();
-    const ch=challenges.find(x=>x.shareCode===c);
-    const sg=sharedGoals.find(x=>x.shareCode===c);
-    if(ch){setResult({type:"challenge",data:ch});setErr("");}
-    else if(sg){setResult({type:"goal",data:sg});setErr("");}
-    else setErr("Код не найден. Проверь и попробуй снова.");
+    if(!c){setErr("Введи код");return;}
+    // Сначала ищем локально (вдруг это своё соревнование)
+    const localCh=challenges.find(x=>x.shareCode===c);
+    const localSg=sharedGoals.find(x=>x.shareCode===c);
+    if(localCh){setResult({type:"challenge",data:localCh});setErr("");return;}
+    if(localSg){setResult({type:"goal",data:localSg});setErr("");return;}
+    // Если не нашли локально — ищем в облаке (Firebase)
+    setLoading(true);setErr("");
+    try{
+      const found=await cloudFind(c);
+      if(found){setResult(found);setErr("");}
+      else setErr("Код не найден. Проверь правильность кода.");
+    }catch{setErr("Ошибка соединения. Проверь интернет.");}
+    finally{setLoading(false);}
   };
-  const join=()=>{
+  const join=async()=>{
     if(!result) return;
-    if(result.type==="challenge") onJoinCh(result.data.id);
-    else onJoinSg(result.data.id);
+    // Добавляем себя как участника в облако (чтобы друг тоже видел)
+    const userName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Друг";
+    if(result.type==="challenge"){
+      onJoinCh(result.data);
+      await cloudAddParticipant("challenge", result.data.shareCode, {name:userName,avatar:"👤",streak:0,lastCompleted:null,history:[]});
+    } else {
+      onJoinSg(result.data);
+      await cloudAddParticipant("goal", result.data.shareCode, userName);
+    }
     onClose();
   };
   return (
@@ -1284,7 +1301,7 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
       <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Введи код от друга</p>
       <div style={{display:"flex",gap:8,marginBottom:14}}>
         <input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&search()} placeholder="ABCDEF" maxLength={6} style={{flex:1,padding:"12px 14px",background:T.bg0,border:`1px solid ${T.brd}`,borderRadius:11,color:T.text,fontSize:20,fontWeight:800,letterSpacing:"0.15em",textAlign:"center",outline:"none",colorScheme:"dark"}}/>
-        <Btn onClick={search} style={{width:80,flexShrink:0}}>Найти</Btn>
+        <Btn onClick={search} style={{width:80,flexShrink:0}} disabled={loading}>{loading?"⏳":"Найти"}</Btn>
       </div>
       {err && <div style={{color:T.rose,fontSize:13,marginBottom:12,textAlign:"center"}}>{err}</div>}
       {result && (
@@ -1456,8 +1473,18 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
     });
   };
 
-  const joinCh = id => onUpdateCh(id, ch=>({...ch, joined:true}));
-  const joinSg = id => onUpdateSg(id, sg=>({...sg, participants:[...new Set([...sg.participants,"Ты"])]}));
+  const joinCh = chData => {
+    // Если соревнование пришло из облака — добавляем его целиком, иначе помечаем joined
+    const exists = challenges ? challenges.find(c=>c.id===chData.id||c.shareCode===chData.shareCode) : false;
+    if(exists) onUpdateCh(chData.id, ch=>({...ch, joined:true}));
+    else onCreateCh({...chData, myStreak:0, myHistory:[], joined:true});
+  };
+  const joinSg = sgData => {
+    const userName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Ты";
+    const exists = sharedGoals ? sharedGoals.find(s=>s.id===sgData.id||s.shareCode===sgData.shareCode) : false;
+    if(exists) onUpdateSg(sgData.id, sg=>({...sg, participants:[...new Set([...sg.participants,userName])]}));
+    else onCreateSg({...sgData, participants:[...new Set([...(sgData.participants||[]),userName])]});
+  };
 
   const toggleSgItem = (sgId, itemId) => onUpdateSg(sgId, sg=>({
     ...sg, items:sg.items.map(it=>it.id!==itemId?it:{...it, done:!it.done, doneBy:!it.done?"Ты":null})
@@ -1610,8 +1637,8 @@ export default function App() {
   const handleUpdateSg = useCallback((id, updFn) => setSharedGoals(p=>p.map(s=>s.id===id?updFn(s):s)), []);
   const handleDeleteCh = useCallback(id => setChallenges(p=>p.filter(c=>c.id!==id)), []);
   const handleDeleteSg = useCallback(id => setSharedGoals(p=>p.filter(s=>s.id!==id)), []);
-  const handleCreateCh = useCallback(ch => setChallenges(p=>[ch,...p]), []);
-  const handleCreateSg = useCallback(sg => setSharedGoals(p=>[sg,...p]), []);
+  const handleCreateCh = useCallback(ch => { setChallenges(p=>[ch,...p]); cloudSave("challenges", ch); }, []);
+  const handleCreateSg = useCallback(sg => { setSharedGoals(p=>[sg,...p]); cloudSave("sharedGoals", sg); }, []);
 
   const level = lvlOf(xp);
 
