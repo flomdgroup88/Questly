@@ -223,21 +223,9 @@ function ModalOverlay({ onClose, children }) {
         width:"100%",maxWidth:420,
         border:`1px solid ${T.brd}`,borderBottom:"none",
         animation:"slideUp 0.32s cubic-bezier(.34,1.56,.64,1)",
-        maxHeight:"90vh",overflowY:"auto",position:"relative",
+        maxHeight:"90vh",overflowY:"auto",
       }}>
         <div style={{width:40,height:4,borderRadius:2,background:T.brd,margin:"8px auto 16px"}}/>
-        {/* ✕ close button */}
-        <div onClick={onClose} style={{
-          position:"absolute",top:14,right:14,
-          width:30,height:30,borderRadius:8,
-          background:T.bg2,border:`1px solid ${T.brd}`,
-          display:"flex",alignItems:"center",justifyContent:"center",
-          cursor:"pointer",fontSize:16,color:T.sub,
-          transition:"all 0.15s",zIndex:10,
-        }}
-        onMouseEnter={e=>{e.currentTarget.style.background=T.bg3;e.currentTarget.style.color=T.text;}}
-        onMouseLeave={e=>{e.currentTarget.style.background=T.bg2;e.currentTarget.style.color=T.sub;}}
-        >✕</div>
         {children}
       </div>
     </div>
@@ -637,7 +625,7 @@ function TaskCard({ task, onToggle, onEdit }) {
 }
 
 // ─── TASKS SCREEN ─────────────────────────────────────────────────
-function TasksScreen({ tasks, onToggle, onSave, onDelete, xp }) {
+function TasksScreen({ tasks, onToggle, onSave, onDelete }) {
   const [filter,setFilter]   = useState("day");
   const [showCreate,setCreate] = useState(false);
   const [editTask,setEdit]   = useState(null);
@@ -653,11 +641,11 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete, xp }) {
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
 
       {/* Period filter tabs */}
-      <div style={{display:"flex",gap:5,padding:"14px 16px 10px"}}>
+      <div style={{display:"flex",gap:6,padding:"14px 16px 10px",overflowX:"auto",scrollbarWidth:"none"}}>
         {PERIODS.map(pd=>(
           <div key={pd.id} onClick={()=>setFilter(pd.id)} style={{
-            flex:1,padding:"7px 2px",borderRadius:20,cursor:"pointer",
-            fontWeight:700,fontSize:12,textAlign:"center",whiteSpace:"nowrap",
+            padding:"7px 14px",borderRadius:20,cursor:"pointer",whiteSpace:"nowrap",
+            fontWeight:700,fontSize:13,flexShrink:0,
             background:filter===pd.id?pd.accent:T.bg2,
             color:filter===pd.id?(pd.id==="month"?"#fff":"#000"):T.sub,
             border:`1px solid ${filter===pd.id?pd.accent:T.brd}`,
@@ -706,26 +694,6 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete, xp }) {
         <div style={{height:100}}/>
       </div>
 
-      {/* Mini header bar at bottom of Квесты tab */}
-      <div style={{
-        padding:"8px 16px",background:T.bg1,borderTop:`1px solid ${T.brd}`,flexShrink:0,
-      }}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
-          <div>
-            <div style={{fontSize:16,fontWeight:900,letterSpacing:"-0.03em"}}>
-              <span style={{color:T.gold}}>Q</span><span style={{color:T.text}}>uestly</span>
-              <span style={{fontSize:10,color:T.sub,fontWeight:400,marginLeft:6,letterSpacing:"0.04em"}}>RPG-трекер задач</span>
-            </div>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:11,color:T.sub}}>Ур.{lvlOf(xp)}</span>
-            <span style={{fontSize:12,fontWeight:800,color:T.purpL}}>{RANK_ICONS[Math.min(lvlOf(xp)-1,RANK_ICONS.length-1)]} {RANKS[Math.min(lvlOf(xp)-1,RANKS.length-1)]}</span>
-            <span style={{fontSize:11,color:T.gold,fontWeight:700}}>⚡ {xp.toLocaleString()} XP</span>
-          </div>
-        </div>
-        <XPBar progress={progOf(xp)} height={3}/>
-      </div>
-
       {/* FAB — correctly positioned inside relative parent */}
       <div style={{position:"absolute",bottom:16,right:16,zIndex:10}}>
         <div onClick={()=>setCreate(true)} style={{
@@ -770,10 +738,10 @@ function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
 
   return (
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:3}}>
-        {WDAYS.map(d=><div key={d} style={{textAlign:"center",fontSize:10,color:T.sub,fontWeight:700,padding:"2px 0"}}>{d}</div>)}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:6}}>
+        {WDAYS.map(d=><div key={d} style={{textAlign:"center",fontSize:11,color:T.sub,fontWeight:700,padding:"4px 0"}}>{d}</div>)}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
         {cells.map((day,i) => {
           if (!day) return <div key={`e${i}`}/>;
           const isToday = isThisMonth && day===tD;
@@ -785,19 +753,19 @@ function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
             <div key={day} onClick={()=>{
               onSelect(`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`);
             }} style={{
-              height:38,borderRadius:8,cursor:"pointer",
+              aspectRatio:"1",borderRadius:9,cursor:"pointer",
               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
               background:isSel?T.purp:isToday?T.bg3:"transparent",
               border:isToday&&!isSel?`1.5px solid ${T.purp}`:"1.5px solid transparent",
               transition:"all 0.15s",
             }}>
               <span style={{
-                fontSize:12,fontWeight:isToday?800:400,lineHeight:1,
+                fontSize:13,fontWeight:isToday?800:400,lineHeight:1,
                 color:isSel?"#fff":isToday?T.purpL:hasBd?T.gold:T.text,
               }}>{day}</span>
               {colors.length>0 && (
-                <div style={{display:"flex",gap:2,marginTop:2}}>
-                  {colors.map((c,ci)=><div key={ci} style={{width:3,height:3,borderRadius:"50%",background:c}}/>)}
+                <div style={{display:"flex",gap:2,marginTop:3}}>
+                  {colors.map((c,ci)=><div key={ci} style={{width:4,height:4,borderRadius:"50%",background:c}}/>)}
                 </div>
               )}
             </div>
@@ -831,13 +799,13 @@ function CalendarScreen({ events, tasks, onAddEvent }) {
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px 6px"}}>
-        <div onClick={prev} style={{width:32,height:32,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:T.sub}}>‹</div>
-        <div style={{fontWeight:800,fontSize:16,color:T.text}}>{MONTHS_RU[month]} {year}</div>
-        <div onClick={next} style={{width:32,height:32,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:T.sub}}>›</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px 10px"}}>
+        <div onClick={prev} style={{width:36,height:36,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:T.sub}}>‹</div>
+        <div style={{fontWeight:800,fontSize:18,color:T.text}}>{MONTHS_RU[month]} {year}</div>
+        <div onClick={next} style={{width:36,height:36,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:T.sub}}>›</div>
       </div>
 
-      <div style={{padding:"0 12px 8px"}}>
+      <div style={{padding:"0 14px 12px"}}>
         <CalendarGrid year={year} month={month} events={events} selectedDate={selDate} onSelect={setSel}/>
       </div>
 
@@ -1111,12 +1079,32 @@ export default function App() {
         </div>
       )}
 
-      {/* Safe area top spacer */}
-      <div style={{height:"env(safe-area-inset-top,0px)",background:T.bg0,flexShrink:0}}/>
+      {/* Header */}
+      <div style={{
+        padding:`calc(14px + env(safe-area-inset-top,0px)) 16px 12px`,
+        background:T.bg1,borderBottom:`1px solid ${T.brd}`,flexShrink:0,
+      }}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:900,letterSpacing:"-0.03em"}}>
+              <span style={{color:T.gold}}>Q</span><span style={{color:T.text}}>uestly</span>
+            </div>
+            <div style={{fontSize:11,color:T.sub,letterSpacing:"0.05em"}}>RPG-трекер задач</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"flex-end",marginBottom:4}}>
+              <span style={{fontSize:11,color:T.sub}}>Ур.{level}</span>
+              <span style={{fontSize:13,fontWeight:800,color:T.purpL}}>{RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)]} {RANKS[Math.min(level-1,RANKS.length-1)]}</span>
+            </div>
+            <span style={{fontSize:11,color:T.gold,fontWeight:700}}>⚡ {xp.toLocaleString()} XP</span>
+          </div>
+        </div>
+        <XPBar progress={progOf(xp)} height={5}/>
+      </div>
 
       {/* Screen */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
-        {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete} xp={xp}/>}
+        {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete}/>}
         {tab==="calendar" && <CalendarScreen events={events} tasks={tasks}           onAddEvent={handleAddEvent}/>}
         {tab==="profile"  && <ProfileScreen  xp={xp}        tasks={tasks}           events={events}/>}
       </div>
