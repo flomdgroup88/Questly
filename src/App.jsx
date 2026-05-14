@@ -63,6 +63,52 @@ const loadState = () => {
 };
 const saveState = s => { try { localStorage.setItem(LS, JSON.stringify(s)); } catch {} };
 
+// ─── SOCIAL LOCALSTORAGE ──────────────────────────────────────────
+const LS_SOC = "questly_social_v1";
+const loadSocial = () => { try { const r=localStorage.getItem(LS_SOC); return r?JSON.parse(r):null; } catch { return null; } };
+const saveSocial = s => { try { localStorage.setItem(LS_SOC, JSON.stringify(s)); } catch {} };
+
+const mkCode = () => Math.random().toString(36).slice(2,8).toUpperCase();
+
+// Simulate today ±N days for demo history
+const pastDay = n => { const d=new Date(); d.setDate(d.getDate()-n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+
+const INIT_CHALLENGES = [
+  {
+    id:"demo_ch1",
+    title:"Утренняя зарядка",
+    emoji:"🏋️",
+    desc:"Каждое утро — 15 минут разминки",
+    shareCode: mkCode(),
+    recurType:"day",
+    createdAt: pastDay(14),
+    myStreak:14,
+    myHistory: Array.from({length:14},(_,i)=>pastDay(13-i)),
+    participants:[
+      { name:"Маша", avatar:"👩", streak:11, lastCompleted:pastDay(0),
+        history: Array.from({length:11},(_,i)=>pastDay(10-i)) }
+    ],
+  },
+];
+
+const INIT_SHARED_GOALS = [
+  {
+    id:"demo_sg1",
+    title:"Ужин в пятницу 🍷",
+    emoji:"🛒",
+    shareCode: mkCode(),
+    createdAt: today,
+    participants:["Ты","Маша"],
+    items:[
+      {id:uid(),title:"Вино 🍷",        assignedTo:"Ты",   doneBy:"Ты",   done:true },
+      {id:uid(),title:"Сыр 🧀",         assignedTo:"Маша", doneBy:"Маша", done:true },
+      {id:uid(),title:"Хлеб 🥖",        assignedTo:null,   doneBy:null,   done:false},
+      {id:uid(),title:"Оливки 🫒",      assignedTo:null,   doneBy:null,   done:false},
+      {id:uid(),title:"Свечи 🕯️",      assignedTo:"Маша", doneBy:null,   done:false},
+    ],
+  },
+];
+
 // ─── DEMO DATA ────────────────────────────────────────────────────
 const today = todayStr();
 const INIT_TASKS = [
@@ -1122,9 +1168,419 @@ function ProfileScreen({ xp, tasks, events }) {
   );
 }
 
+// ─── SHARE SHEET ─────────────────────────────────────────────────
+function ShareSheet({ code, title, onClose }) {
+  const [copied,setCopied]=useState(false);
+  const link = `https://t.me/questly_bot?start=${code}`;
+  const copy = () => { navigator.clipboard?.writeText(link).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div style={{textAlign:"center",marginBottom:20}}>
+        <div style={{fontSize:40,marginBottom:8}}>🔗</div>
+        <h3 style={{margin:0,fontSize:18,fontWeight:800,color:T.teal}}>Поделиться</h3>
+        <p style={{margin:"6px 0 0",fontSize:13,color:T.sub}}>«{title}»</p>
+      </div>
+      <div style={{background:T.bg0,borderRadius:12,padding:"14px 16px",marginBottom:14,border:`1px solid ${T.brd}`}}>
+        <div style={{fontSize:11,color:T.sub,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.08em"}}>Код для друга</div>
+        <div style={{fontSize:28,fontWeight:900,color:T.gold,letterSpacing:"0.15em",textAlign:"center"}}>{code}</div>
+      </div>
+      <div style={{background:T.bg0,borderRadius:12,padding:"12px 14px",marginBottom:16,border:`1px solid ${T.brd}`,wordBreak:"break-all",fontSize:12,color:T.sub}}>{link}</div>
+      <div style={{display:"flex",gap:10}}>
+        <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Закрыть</Btn>
+        <Btn variant="teal" onClick={copy} style={{flex:2}}>{copied?"✓ Скопировано!":"📋 Скопировать ссылку"}</Btn>
+      </div>
+      {tg && <div style={{marginTop:10}}><Btn variant="primary" onClick={()=>{tg.switchInlineQuery&&tg.switchInlineQuery(`Присоединяйся к квесту «${title}» — код: ${code}`, ["users","groups"]);onClose();}}>✈️ Отправить в Telegram</Btn></div>}
+    </ModalOverlay>
+  );
+}
+
+// ─── NEW CHALLENGE MODAL ──────────────────────────────────────────
+function NewChallengeModal({ onClose, onCreate }) {
+  const [title,setTitle]=useState(""); const [emoji,setEmoji]=useState("🏋️"); const [desc,setDesc]=useState(""); const [rt,setRT]=useState("day");
+  const EMOJIS=["🏋️","🏃","🧘","📚","💧","🌅","🎯","💪","🚴","🍎","✏️","🎸"];
+  const submit=()=>{
+    if (!title.trim()) return;
+    onCreate({ id:uid(), title:title.trim(), emoji, desc:desc.trim(), shareCode:mkCode(), recurType:rt, createdAt:today, myStreak:0, myHistory:[], participants:[] });
+    onClose();
+  };
+  return (
+    <ModalOverlay onClose={onClose}>
+      <h3 style={{margin:"0 0 4px",fontSize:18,fontWeight:800,color:T.purpL}}>🏆 Новое соревнование</h3>
+      <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Создай серию задач и соревнуйся с другом</p>
+      <div style={{marginBottom:14}}>
+        <SectionLabel>Эмодзи</SectionLabel>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+          {EMOJIS.map(e=><div key={e} onClick={()=>setEmoji(e)} style={{width:38,height:38,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,background:emoji===e?T.purp+"44":T.bg0,border:`2px solid ${emoji===e?T.purp:T.brd}`,transition:"all 0.15s"}}>{e}</div>)}
+        </div>
+      </div>
+      <div style={{marginBottom:14}}><SectionLabel>Название</SectionLabel><StyledInput value={title} onChange={e=>setTitle(e.target.value)} placeholder="Утренняя зарядка…" autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/></div>
+      <div style={{marginBottom:14}}><SectionLabel>Описание (необязательно)</SectionLabel><StyledInput value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Что нужно делать каждый день?"/></div>
+      <div style={{marginBottom:18}}><SectionLabel>Периодичность</SectionLabel><RecurPicker value={rt} onChange={setRT}/></div>
+      <div style={{display:"flex",gap:10}}>
+        <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
+        <Btn variant="primary" onClick={submit} style={{flex:2}} disabled={!title.trim()}>Создать ⚡</Btn>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─── NEW SHARED GOAL MODAL ────────────────────────────────────────
+function NewSharedGoalModal({ onClose, onCreate }) {
+  const [title,setTitle]=useState(""); const [itemText,setItemText]=useState("");
+  const [items,setItems]=useState([]);
+  const addItem=()=>{ if(!itemText.trim()) return; setItems(p=>[...p,{id:uid(),title:itemText.trim(),assignedTo:null,doneBy:null,done:false}]); setItemText(""); };
+  const removeItem=id=>setItems(p=>p.filter(x=>x.id!==id));
+  const submit=()=>{
+    if(!title.trim()||items.length===0) return;
+    onCreate({ id:uid(), title:title.trim(), emoji:"🎯", shareCode:mkCode(), createdAt:today, participants:["Ты"], items });
+    onClose();
+  };
+  return (
+    <ModalOverlay onClose={onClose}>
+      <h3 style={{margin:"0 0 4px",fontSize:18,fontWeight:800,color:T.teal}}>🎯 Общая цель</h3>
+      <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Раздели задачи с другом и выполняйте вместе</p>
+      <div style={{marginBottom:14}}><SectionLabel>Название</SectionLabel><StyledInput value={title} onChange={e=>setTitle(e.target.value)} placeholder="Список покупок / Подготовка к вечеринке…" autoFocus onKeyDown={e=>e.key==="Enter"&&document.getElementById("sg-item-input")?.focus()}/></div>
+      <div style={{marginBottom:14}}>
+        <SectionLabel>Пункты ({items.length})</SectionLabel>
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
+          <input id="sg-item-input" value={itemText} onChange={e=>setItemText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addItem()} placeholder="Добавить пункт…" style={{flex:1,padding:"10px 13px",background:T.bg0,border:`1px solid ${T.brd}`,borderRadius:10,color:T.text,fontSize:14,outline:"none",colorScheme:"dark"}}/>
+          <div onClick={addItem} style={{width:40,height:40,borderRadius:10,background:T.teal+"33",border:`1px solid ${T.teal}66`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:20,color:T.teal,flexShrink:0}}>+</div>
+        </div>
+        {items.map(it=>(
+          <div key={it.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:T.bg0,borderRadius:10,border:`1px solid ${T.brd}`,marginBottom:6}}>
+            <span style={{fontSize:14,color:T.text,flex:1}}>{it.title}</span>
+            <div onClick={()=>removeItem(it.id)} style={{fontSize:14,color:T.rose,cursor:"pointer",padding:"2px 6px"}}>✕</div>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:10}}>
+        <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
+        <Btn variant="teal" onClick={submit} style={{flex:2}} disabled={!title.trim()||items.length===0}>Создать 🎯</Btn>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─── JOIN BY CODE MODAL ───────────────────────────────────────────
+function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
+  const [code,setCode]=useState(""); const [result,setResult]=useState(null); const [err,setErr]=useState("");
+  const search=()=>{
+    const c=code.trim().toUpperCase();
+    const ch=challenges.find(x=>x.shareCode===c);
+    const sg=sharedGoals.find(x=>x.shareCode===c);
+    if(ch){setResult({type:"challenge",data:ch});setErr("");}
+    else if(sg){setResult({type:"goal",data:sg});setErr("");}
+    else setErr("Код не найден. Проверь и попробуй снова.");
+  };
+  const join=()=>{
+    if(!result) return;
+    if(result.type==="challenge") onJoinCh(result.data.id);
+    else onJoinSg(result.data.id);
+    onClose();
+  };
+  return (
+    <ModalOverlay onClose={onClose}>
+      <h3 style={{margin:"0 0 4px",fontSize:18,fontWeight:800,color:T.sky}}>🔗 Присоединиться</h3>
+      <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Введи код от друга</p>
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        <input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&search()} placeholder="ABCDEF" maxLength={6} style={{flex:1,padding:"12px 14px",background:T.bg0,border:`1px solid ${T.brd}`,borderRadius:11,color:T.text,fontSize:20,fontWeight:800,letterSpacing:"0.15em",textAlign:"center",outline:"none",colorScheme:"dark"}}/>
+        <Btn onClick={search} style={{width:80,flexShrink:0}}>Найти</Btn>
+      </div>
+      {err && <div style={{color:T.rose,fontSize:13,marginBottom:12,textAlign:"center"}}>{err}</div>}
+      {result && (
+        <div style={{background:T.bg0,borderRadius:13,border:`2px solid ${result.type==="challenge"?T.purp:T.teal}`,padding:"16px",marginBottom:16}}>
+          <div style={{fontSize:24,marginBottom:6}}>{result.type==="challenge"?"🏆":"🎯"}</div>
+          <div style={{fontSize:16,fontWeight:800,color:T.text,marginBottom:4}}>{result.data.title}</div>
+          <div style={{fontSize:12,color:T.sub}}>{result.type==="challenge"?"Соревнование":"Общая цель"} · {result.type==="challenge"?`${result.data.participants.length+1} участников`:`${result.data.items.length} пунктов`}</div>
+        </div>
+      )}
+      <div style={{display:"flex",gap:10}}>
+        <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
+        <Btn variant="primary" onClick={join} style={{flex:2}} disabled={!result}>Присоединиться 🤝</Btn>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─── CHALLENGE DETAIL MODAL ───────────────────────────────────────
+function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
+  const myDoneToday = ch.myHistory.includes(today);
+  const period = ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно";
+  const allParts = [
+    { name:"Ты", avatar:"🧙", streak:ch.myStreak, history:ch.myHistory, isMe:true },
+    ...ch.participants.map(p=>({...p, isMe:false})),
+  ].sort((a,b)=>b.streak-a.streak);
+
+  const last21 = Array.from({length:21},(_,i)=>pastDay(20-i));
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div style={{textAlign:"center",marginBottom:16}}>
+        <div style={{fontSize:44,marginBottom:4}}>{ch.emoji}</div>
+        <h3 style={{margin:0,fontSize:19,fontWeight:900,color:T.text}}>{ch.title}</h3>
+        {ch.desc && <p style={{margin:"4px 0 0",fontSize:13,color:T.sub}}>{ch.desc}</p>}
+        <div style={{fontSize:12,color:T.dim,marginTop:4}}>{period}</div>
+      </div>
+
+      {/* Leaderboard */}
+      <div style={{marginBottom:16}}>
+        <SectionLabel>🏆 Таблица лидеров</SectionLabel>
+        {allParts.map((p,i)=>(
+          <div key={p.name} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:i===0?T.gold+"15":T.bg0,borderRadius:12,border:`1px solid ${i===0?T.gold+"44":T.brd}`,marginBottom:8}}>
+            <div style={{fontSize:18,width:24,textAlign:"center",fontWeight:900,color:i===0?T.gold:T.sub}}>#{i+1}</div>
+            <div style={{fontSize:24,width:32,textAlign:"center"}}>{p.avatar||"👤"}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:p.isMe?T.purpL:T.text}}>{p.name}{p.isMe?" (ты)":""}</div>
+              <div style={{fontSize:11,color:T.sub,marginTop:2}}>{p.history.length} дней выполнено</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:20,fontWeight:900,color:"#FF6B35"}}>🔥 {p.streak}</div>
+              <div style={{fontSize:10,color:T.dim}}>дней</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Activity heatmap — last 21 days */}
+      <div style={{marginBottom:16}}>
+        <SectionLabel>Активность за 3 недели</SectionLabel>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+          {last21.map(d=>{
+            const myD=ch.myHistory.includes(d);
+            const friendDs=ch.participants.filter(p=>p.history.includes(d));
+            return (
+              <div key={d} style={{aspectRatio:"1",borderRadius:6,position:"relative",overflow:"hidden",background:T.bg0,border:`1px solid ${T.brd}`}}>
+                {myD && <div style={{position:"absolute",bottom:0,left:0,right:0,height:"50%",background:T.purp+"88"}}/>}
+                {friendDs.length>0 && <div style={{position:"absolute",top:0,left:0,right:0,height:"50%",background:T.teal+"88"}}/>}
+                {myD && friendDs.length>0 && <div style={{position:"absolute",inset:0,background:"transparent",border:`2px solid ${T.gold}66`,borderRadius:5}}/>}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display:"flex",gap:16,marginTop:8,justifyContent:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:T.sub}}><div style={{width:12,height:12,borderRadius:3,background:T.purp+"88"}}/> Ты</div>
+          {ch.participants.map(p=><div key={p.name} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:T.sub}}><div style={{width:12,height:12,borderRadius:3,background:T.teal+"88"}}/>{p.name}</div>)}
+        </div>
+      </div>
+
+      <div style={{display:"flex",gap:10,marginBottom:10}}>
+        <Btn variant="ghost" onClick={onShare} style={{flex:1}}>🔗 Поделиться</Btn>
+        <Btn variant={myDoneToday?"ghost":"primary"} onClick={()=>{if(!myDoneToday){onComplete(ch.id);onClose();}}} style={{flex:2}} disabled={myDoneToday}>
+          {myDoneToday?"✓ Сделано сегодня":"Отметить сегодня ✓"}
+        </Btn>
+      </div>
+      <Btn variant="danger" onClick={()=>{onDelete(ch.id);onClose();}}>🗑 Удалить соревнование</Btn>
+    </ModalOverlay>
+  );
+}
+
+// ─── SHARED GOAL DETAIL MODAL ─────────────────────────────────────
+function SharedGoalDetail({ sg, onClose, onToggleItem, onAssign, onShare, onDelete }) {
+  const done = sg.items.filter(x=>x.done).length;
+  const total = sg.items.length;
+  const pct = total>0?done/total:0;
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div style={{textAlign:"center",marginBottom:16}}>
+        <div style={{fontSize:40,marginBottom:4}}>{sg.emoji}</div>
+        <h3 style={{margin:0,fontSize:19,fontWeight:900,color:T.text}}>{sg.title}</h3>
+        <p style={{margin:"4px 0 0",fontSize:13,color:T.sub}}>Участники: {sg.participants.join(", ")}</p>
+      </div>
+
+      <div style={{background:T.bg0,borderRadius:12,padding:"12px 14px",marginBottom:16,border:`1px solid ${T.brd}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+          <span style={{fontSize:13,color:T.sub}}>Общий прогресс</span>
+          <span style={{fontSize:13,fontWeight:700,color:T.teal}}>{done}/{total} ·  {Math.round(pct*100)}%</span>
+        </div>
+        <XPBar progress={pct} color={T.teal} height={8}/>
+      </div>
+
+      <div style={{marginBottom:16}}>
+        <SectionLabel>Список ({done} из {total} выполнено)</SectionLabel>
+        {sg.items.map(it=>(
+          <div key={it.id} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 13px",background:it.done?T.teal+"12":T.bg0,borderRadius:11,border:`1px solid ${it.done?T.teal+"44":T.brd}`,marginBottom:8,transition:"all 0.2s"}}>
+            <div onClick={()=>onToggleItem(sg.id,it.id)} style={{width:26,height:26,borderRadius:"50%",border:`2.5px solid ${it.done?T.teal:T.dim}`,background:it.done?T.teal:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:13,fontWeight:900,color:"#000",transition:"all 0.2s"}}>
+              {it.done&&"✓"}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,color:it.done?T.sub:T.text,textDecoration:it.done?"line-through":"none"}}>{it.title}</div>
+              {it.assignedTo && <div style={{fontSize:11,color:it.done?T.teal:T.sub,marginTop:2}}>{it.done?`✓ ${it.doneBy}`:` ${it.assignedTo}`}</div>}
+            </div>
+            {!it.done && !it.assignedTo && (
+              <div onClick={()=>onAssign(sg.id,it.id,"Ты")} style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:T.purp+"33",color:T.purpL,border:`1px solid ${T.purp}55`,cursor:"pointer",whiteSpace:"nowrap"}}>Беру я</div>
+            )}
+            {!it.done && it.assignedTo==="Ты" && (
+              <div style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:T.purp+"22",color:T.purpL,border:`1px solid ${T.purp}44`}}>→ Ты</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:"flex",gap:10,marginBottom:10}}>
+        <Btn variant="ghost" onClick={onShare} style={{flex:1}}>🔗 Поделиться</Btn>
+        <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Закрыть</Btn>
+      </div>
+      <Btn variant="danger" onClick={()=>{onDelete(sg.id);onClose();}}>🗑 Удалить цель</Btn>
+    </ModalOverlay>
+  );
+}
+
+// ─── SOCIAL SCREEN ────────────────────────────────────────────────
+function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg }) {
+  const [tab,setTab]=useState("challenges");
+  const [showNewCh,setNewCh]=useState(false);
+  const [showNewSg,setNewSg]=useState(false);
+  const [showJoin,setJoin]=useState(false);
+  const [detailCh,setDetailCh]=useState(null);
+  const [detailSg,setDetailSg]=useState(null);
+  const [shareItem,setShare]=useState(null); // {code,title}
+
+  const completeCh = id => {
+    onUpdateCh(id, ch => {
+      if (ch.myHistory.includes(today)) return ch;
+      const newHistory=[...ch.myHistory, today];
+      // recount streak from history
+      let streak=0;
+      const sorted=[...newHistory].sort();
+      const last=sorted[sorted.length-1];
+      if(last===today){
+        let cur=today; streak=1;
+        while(true){
+          const d=new Date(cur); d.setDate(d.getDate()-1);
+          const prev=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+          if(sorted.includes(prev)){streak++;cur=prev;}else break;
+        }
+      }
+      return {...ch, myHistory:newHistory, myStreak:streak};
+    });
+  };
+
+  const joinCh = id => onUpdateCh(id, ch=>({...ch, joined:true}));
+  const joinSg = id => onUpdateSg(id, sg=>({...sg, participants:[...new Set([...sg.participants,"Ты"])]}));
+
+  const toggleSgItem = (sgId, itemId) => onUpdateSg(sgId, sg=>({
+    ...sg, items:sg.items.map(it=>it.id!==itemId?it:{...it, done:!it.done, doneBy:!it.done?"Ты":null})
+  }));
+
+  const assignSgItem = (sgId, itemId, name) => onUpdateSg(sgId, sg=>({
+    ...sg, items:sg.items.map(it=>it.id!==itemId?it:{...it, assignedTo:name})
+  }));
+
+  const ChallengeCard = ({ch}) => {
+    const allParts = [{name:"Ты",streak:ch.myStreak,isMe:true},...ch.participants];
+    const top = [...allParts].sort((a,b)=>b.streak-a.streak)[0];
+    const myDoneToday=ch.myHistory.includes(today);
+    return (
+      <div onClick={()=>setDetailCh(ch)} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"14px 16px",marginBottom:10,cursor:"pointer",transition:"all 0.15s"}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
+          <div style={{fontSize:32,width:48,height:48,borderRadius:12,background:T.purp+"22",border:`1px solid ${T.purp}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{ch.emoji}</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:700,color:T.text}}>{ch.title}</div>
+            {ch.desc && <div style={{fontSize:12,color:T.sub,marginTop:2,lineHeight:1.4}}>{ch.desc}</div>}
+            <div style={{fontSize:11,color:T.dim,marginTop:3}}>{ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно"}</div>
+          </div>
+          <div style={{textAlign:"right",flexShrink:0}}>
+            {myDoneToday
+              ? <span style={{fontSize:11,fontWeight:700,color:T.teal,background:T.teal+"22",padding:"3px 9px",borderRadius:20}}>✓ сегодня</span>
+              : <span style={{fontSize:11,color:T.rose,background:T.rose+"22",padding:"3px 9px",borderRadius:20}}>сегодня</span>}
+          </div>
+        </div>
+
+        {/* Mini leaderboard */}
+        <div style={{display:"flex",gap:6}}>
+          {allParts.sort((a,b)=>b.streak-a.streak).map((p,i)=>(
+            <div key={p.name} style={{flex:1,background:i===0?T.gold+"18":T.bg0,borderRadius:10,padding:"8px 6px",textAlign:"center",border:`1px solid ${i===0?T.gold+"44":T.brd}`}}>
+              <div style={{fontSize:10,color:T.sub,marginBottom:3,fontWeight:600}}>{p.name}{p.isMe?" 👤":""}</div>
+              <div style={{fontSize:16,fontWeight:900,color:"#FF6B35"}}>🔥{p.streak}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const GoalCard = ({sg}) => {
+    const done=sg.items.filter(x=>x.done).length, total=sg.items.length;
+    const myDone=sg.items.filter(x=>x.doneBy==="Ты").length;
+    return (
+      <div onClick={()=>setDetailSg(sg)} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"14px 16px",marginBottom:10,cursor:"pointer"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+          <div style={{fontSize:28,width:44,height:44,borderRadius:11,background:T.teal+"22",border:`1px solid ${T.teal}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{sg.emoji}</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:700,color:T.text}}>{sg.title}</div>
+            <div style={{fontSize:11,color:T.sub,marginTop:2}}>{sg.participants.join(" · ")}</div>
+          </div>
+          <div style={{textAlign:"right",flexShrink:0}}>
+            <div style={{fontSize:16,fontWeight:800,color:T.teal}}>{done}<span style={{fontSize:11,color:T.sub}}>/{total}</span></div>
+            <div style={{fontSize:10,color:T.sub}}>пунктов</div>
+          </div>
+        </div>
+        <XPBar progress={total>0?done/total:0} color={T.teal} height={5}/>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
+          <div style={{fontSize:11,color:T.sub}}>{total-done} пунктов осталось</div>
+          {myDone>0 && <div style={{fontSize:11,color:T.teal,fontWeight:700}}>ты взял: {myDone} ✓</div>}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      {/* Sub-tabs */}
+      <div style={{padding:"10px 16px 8px",flexShrink:0}}>
+        <div style={{display:"flex",background:T.bg2,borderRadius:13,padding:4,border:`1px solid ${T.brd}`,gap:4}}>
+          {[["challenges","🏆 Соревнования"],["goals","🎯 Общие цели"]].map(([id,label])=>(
+            <div key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"8px 0",borderRadius:9,cursor:"pointer",textAlign:"center",fontSize:13,fontWeight:700,background:tab===id?T.purp:"transparent",color:tab===id?"#fff":T.sub,transition:"all 0.2s"}}>{label}</div>
+          ))}
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div style={{display:"flex",gap:8,padding:"0 16px 10px",flexShrink:0}}>
+        <div onClick={()=>tab==="challenges"?setNewCh(true):setNewSg(true)} style={{flex:1,padding:"9px 0",borderRadius:11,background:`linear-gradient(135deg,${T.purp},${T.gold})`,color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",cursor:"pointer"}}>
+          + {tab==="challenges"?"Создать":"Новая цель"}
+        </div>
+        <div onClick={()=>setJoin(true)} style={{padding:"9px 14px",borderRadius:11,background:T.sky+"22",color:T.sky,fontWeight:700,fontSize:13,border:`1px solid ${T.sky}44`,cursor:"pointer",whiteSpace:"nowrap"}}>
+          🔗 Войти
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{flex:1,overflowY:"auto",padding:"0 16px",WebkitOverflowScrolling:"touch"}}>
+        {tab==="challenges" && (
+          challenges.length===0
+            ? <div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🏆</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет соревнований</div><div style={{fontSize:13,marginTop:6}}>Создай серию и поделись с другом</div></div>
+            : challenges.map(ch=><ChallengeCard key={ch.id} ch={ch}/>)
+        )}
+        {tab==="goals" && (
+          sharedGoals.length===0
+            ? <div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🎯</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет общих целей</div><div style={{fontSize:13,marginTop:6}}>Поделись списком задач с другом</div></div>
+            : sharedGoals.map(sg=><GoalCard key={sg.id} sg={sg}/>)
+        )}
+        <div style={{height:20}}/>
+      </div>
+
+      {/* Modals */}
+      {showNewCh && <NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch);setNewCh(false);}}/>}
+      {showNewSg && <NewSharedGoalModal onClose={()=>setNewSg(false)} onCreate={sg=>{onCreateSg(sg);setNewSg(false);}}/>}
+      {showJoin  && <JoinModal challenges={challenges} sharedGoals={sharedGoals} onClose={()=>setJoin(false)} onJoinCh={joinCh} onJoinSg={joinSg}/>}
+      {shareItem && <ShareSheet code={shareItem.code} title={shareItem.title} onClose={()=>setShare(null)}/>}
+      {detailCh  && <ChallengeDetail ch={detailCh} onClose={()=>setDetailCh(null)}
+          onComplete={completeCh} onShare={()=>{setShare({code:detailCh.shareCode,title:detailCh.title});setDetailCh(null);}}
+          onDelete={id=>{onDeleteCh(id);setDetailCh(null);}}/>}
+      {detailSg  && <SharedGoalDetail sg={detailSg} onClose={()=>setDetailSg(null)}
+          onToggleItem={toggleSgItem} onAssign={assignSgItem}
+          onShare={()=>{setShare({code:detailSg.shareCode,title:detailSg.title});setDetailSg(null);}}
+          onDelete={id=>{onDeleteSg(id);setDetailSg(null);}}/>}
+    </div>
+  );
+}
+
 // ─── APP ROOT ─────────────────────────────────────────────────────
 export default function App() {
   const saved = loadState();
+  const savedSoc = loadSocial();
   const [xp,     setXP]    = useState(saved?.xp     ?? 340);
   const [tasks,  setTasks] = useState(saved?.tasks   ?? INIT_TASKS);
   const [events, setEvts]  = useState(saved?.events  ?? INIT_EVENTS);
@@ -1132,6 +1588,9 @@ export default function App() {
   const [xpAnim,  setXPAnim]  = useState(null);
   const [lvlUpAnim,setLvlUp] = useState(false);
   const prevLvlRef = useRef(lvlOf(saved?.xp??340));
+
+  const [challenges,  setChallenges]  = useState(savedSoc?.challenges  ?? INIT_CHALLENGES);
+  const [sharedGoals, setSharedGoals] = useState(savedSoc?.sharedGoals ?? INIT_SHARED_GOALS);
 
   // On mount: rollover overdue tasks, then spawn recurring instances for today
   useEffect(() => {
@@ -1144,6 +1603,15 @@ export default function App() {
 
   // Persist on every change
   useEffect(() => { saveState({xp,tasks,events}); }, [xp,tasks,events]);
+  useEffect(() => { saveSocial({challenges,sharedGoals}); }, [challenges,sharedGoals]);
+
+  // ── Social handlers ──────────────────────────────────────────────
+  const handleUpdateCh = useCallback((id, updFn) => setChallenges(p=>p.map(c=>c.id===id?updFn(c):c)), []);
+  const handleUpdateSg = useCallback((id, updFn) => setSharedGoals(p=>p.map(s=>s.id===id?updFn(s):s)), []);
+  const handleDeleteCh = useCallback(id => setChallenges(p=>p.filter(c=>c.id!==id)), []);
+  const handleDeleteSg = useCallback(id => setSharedGoals(p=>p.filter(s=>s.id!==id)), []);
+  const handleCreateCh = useCallback(ch => setChallenges(p=>[ch,...p]), []);
+  const handleCreateSg = useCallback(sg => setSharedGoals(p=>[sg,...p]), []);
 
   const level = lvlOf(xp);
 
@@ -1193,6 +1661,7 @@ export default function App() {
   const TABS = [
     {id:"tasks",    label:"Квесты",    icon:"⚔️"},
     {id:"calendar", label:"Календарь", icon:"📅"},
+    {id:"social",   label:"Союзники",  icon:"🤝"},
     {id:"profile",  label:"Герой",     icon:"🧙"},
   ];
 
@@ -1265,6 +1734,7 @@ export default function App() {
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
         {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete}/>}
         {tab==="calendar" && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent}/>}
+        {tab==="social"   && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg}/>}
         {tab==="profile"  && <ProfileScreen  xp={xp}        tasks={tasks}           events={events}/>}
       </div>
 
