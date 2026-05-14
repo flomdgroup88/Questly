@@ -46,18 +46,31 @@ const isBdTitle = t => /\bдр\b|день рождения|днюха|birthday/i
 const bdName    = t => { const m = t.match(/(?:др|день рождения|днюха|birthday)[:\s]+(.+)/i)||t.match(/(.+?)[\s,–-]+(?:др|день рождения|днюха)/i); return m?m[1].trim():t.trim(); };
 
 // ─── LOCALSTORAGE ─────────────────────────────────────────────────
-const LS = "questly_v1";
-const loadState = () => { try { const r = localStorage.getItem(LS); return r ? JSON.parse(r) : null; } catch { return null; } };
+const LS = "questly_v2";
+const loadState = () => {
+  try {
+    const r = localStorage.getItem(LS) || localStorage.getItem("questly_v1");
+    if (!r) return null;
+    const state = JSON.parse(r);
+    // Migrate: add streakEnabled/streak defaults if missing
+    if (state.tasks) {
+      state.tasks = state.tasks.map(t => ({
+        streakEnabled: false, streak: 0, ...t,
+      }));
+    }
+    return state;
+  } catch { return null; }
+};
 const saveState = s => { try { localStorage.setItem(LS, JSON.stringify(s)); } catch {} };
 
 // ─── DEMO DATA ────────────────────────────────────────────────────
 const today = todayStr();
 const INIT_TASKS = [
-  { id:uid(), title:"Утренняя зарядка",     period:"day",   done:false, xp:15,  dueDate:today, recurring:false, recurType:"" },
-  { id:uid(), title:"Прочитать 20 страниц", period:"day",   done:true,  xp:15,  dueDate:today, recurring:false, recurType:"" },
-  { id:uid(), title:"Подготовить отчёт",    period:"week",  done:false, xp:50,  dueDate:today, recurring:false, recurType:"" },
-  { id:uid(), title:"Пройти курс по React", period:"month", done:false, xp:150, dueDate:today, recurring:false, recurType:"" },
-  { id:uid(), title:"Запустить проект",     period:"year",  done:false, xp:600, dueDate:today, recurring:false, recurType:"" },
+  { id:uid(), title:"Утренняя зарядка",     period:"day",   done:false, xp:15,  dueDate:today, recurring:true,  recurType:"day",  streakEnabled:true,  streak:0 },
+  { id:uid(), title:"Прочитать 20 страниц", period:"day",   done:true,  xp:15,  dueDate:today, recurring:false, recurType:"",     streakEnabled:false, streak:0 },
+  { id:uid(), title:"Подготовить отчёт",    period:"week",  done:false, xp:50,  dueDate:today, recurring:false, recurType:"",     streakEnabled:false, streak:0 },
+  { id:uid(), title:"Пройти курс по React", period:"month", done:false, xp:150, dueDate:today, recurring:false, recurType:"",     streakEnabled:false, streak:0 },
+  { id:uid(), title:"Запустить проект",     period:"year",  done:false, xp:600, dueDate:today, recurring:false, recurType:"",     streakEnabled:false, streak:0 },
 ];
 const INIT_EVENTS = [
   { id:uid(), title:"ДР Алексея",       date:today, recurring:true,  recurType:"year", isBirthday:true,  color:T.gold, eventType:"birthday" },
@@ -138,6 +151,24 @@ const EVENT_TYPES = [
   },
 ];
 
+// ─── AUTO ROLLOVER ────────────────────────────────────────────────
+// Non-recurring unfinished tasks from past periods → moved to today
+// Recurring tasks: handled by spawnRecurring (new instance each period)
+// Streak resets if a recurring task is missed (determined at spawn time)
+const autoRollover = (tasks) => {
+  return tasks.map(t => {
+    if (!t.done && t.dueDate < today && !t.recurring) {
+      return {
+        ...t,
+        dueDate: today,
+        rolledOver: true,
+        streak: 0, // streak breaks if you miss
+      };
+    }
+    return t;
+  });
+};
+
 // ─── RECURRING AUTO-SPAWN ─────────────────────────────────────────
 const spawnRecurring = (tasks, events, day) => {
   const next = [...tasks];
@@ -145,8 +176,31 @@ const spawnRecurring = (tasks, events, day) => {
     const ok = t.recurType==="day"
       || (t.recurType==="week" && new Date(t.dueDate).getDay()===new Date(day).getDay())
       || (t.recurType==="year" && t.dueDate.slice(5)===day.slice(5));
-    if (ok && !next.some(x => x.title===t.title && x.dueDate===day))
-      next.unshift({...t, id:uid(), done:false, dueDate:day});
+    if (ok && !next.some(x => x.title===t.title && x.dueDate===day)) {
+      // Streak: check if the previous period's instance was completed
+      let inheritedStreak = 0;
+      if (t.streakEnabled) {
+        // Find the most recent done instance of this recurring task
+        const doneInstances = tasks
+          .filter(x => x.title===t.title && x.streakEnabled && x.done)
+          .sort((a,b) => b.dueDate.localeCompare(a.dueDate));
+        if (doneInstances.length > 0) {
+          const lastDone = doneInstances[0];
+          // Check if the gap is exactly one period (streak continues) or broken
+          const lastDate = new Date(lastDone.dueDate);
+          const today_ = new Date(day);
+          const diffMs = today_ - lastDate;
+          const diffDays = Math.round(diffMs / 86400000);
+          const streakContinues =
+            (t.recurType==="day"  && diffDays <= 1)  ||
+            (t.recurType==="week" && diffDays <= 7)  ||
+            (t.recurType==="year" && diffDays <= 366);
+          inheritedStreak = streakContinues ? (lastDone.streak || 0) : 0;
+        }
+      }
+      next.unshift({...t, id:uid(), done:false, dueDate:day,
+        streak: inheritedStreak, rolledOver: false});
+    }
   });
   // Spawn tasks from recurring calendar events using EVENT_TYPES templates
   events.filter(e => e.recurring).forEach(ev => {
@@ -161,7 +215,8 @@ const spawnRecurring = (tasks, events, day) => {
     templates.forEach(tmpl => {
       if (!next.some(x => x.title===tmpl.title && x.dueDate===day))
         next.unshift({id:uid(), done:false, period:"day", xp:tmpl.xp||15,
-          dueDate:day, recurring:true, recurType:ev.recurType, ...tmpl});
+          dueDate:day, recurring:true, recurType:ev.recurType,
+          streakEnabled:false, streak:0, ...tmpl});
     });
   });
   return next;
@@ -286,20 +341,24 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
   const [dueDate,  setDate]   = useState(existing?.dueDate  ?? today);
   const [recurring,setRec]    = useState(existing?.recurring ?? false);
   const [recurType,setRT]     = useState(existing?.recurType ?? "day");
+  const [streakEnabled, setStreak] = useState(existing?.streakEnabled ?? false);
   const [bulkMode, setBulk]   = useState(false);
   const [bulkText, setBulkText] = useState("");
+
+  // If recurring toggled off — disable streak too
+  const handleSetRec = v => { setRec(v); if (!v) setStreak(false); };
 
   const submit = () => {
     const p = PERIODS.find(x=>x.id===period);
     if (bulkMode && !isEdit) {
       const lines = bulkText.split("\n").map(l=>l.trim()).filter(Boolean);
       if (!lines.length) return;
-      lines.forEach(line => onSave({ id:uid(), title:line, period, done:false, xp:p.xp, dueDate, recurring, recurType }));
+      lines.forEach(line => onSave({ id:uid(), title:line, period, done:false, xp:p.xp, dueDate, recurring, recurType, streakEnabled, streak:0 }));
       onClose();
       return;
     }
     if (!title.trim()) return;
-    onSave({ id:existing?.id??uid(), title:title.trim(), period, done:existing?.done??false, xp:p.xp, dueDate, recurring, recurType });
+    onSave({ id:existing?.id??uid(), title:title.trim(), period, done:existing?.done??false, xp:p.xp, dueDate, recurring, recurType, streakEnabled, streak:existing?.streak??0 });
     onClose();
   };
 
@@ -376,10 +435,32 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
         marginBottom:recurring?10:18,background:T.bg0,padding:"11px 14px",borderRadius:11,border:`1px solid ${T.brd}`}}>
         <span style={{fontSize:14,color:T.text}}>🔄 Повторяемая задача</span>
-        <Toggle value={recurring} onChange={setRec}/>
+        <Toggle value={recurring} onChange={handleSetRec}/>
       </div>
 
-      {recurring && <div style={{marginBottom:18}}><RecurPicker value={recurType} onChange={setRT}/></div>}
+      {recurring && (
+        <>
+          <div style={{marginBottom:10}}><RecurPicker value={recurType} onChange={setRT}/></div>
+
+          {/* Streak toggle — only for recurring tasks */}
+          <div style={{
+            display:"flex",alignItems:"center",justifyContent:"space-between",
+            marginBottom:18,background:T.bg0,padding:"11px 14px",borderRadius:11,
+            border:`1px solid ${streakEnabled?"#FF6B3555":T.brd}`,
+            transition:"border-color 0.2s",
+          }}>
+            <div>
+              <span style={{fontSize:14,color:T.text}}>🔥 Отслеживать серию</span>
+              {streakEnabled && (
+                <div style={{fontSize:11,color:"#FF6B35",marginTop:3,fontWeight:600}}>
+                  Считает дни подряд — не прерви цепочку!
+                </div>
+              )}
+            </div>
+            <Toggle value={streakEnabled} onChange={setStreak}/>
+          </div>
+        </>
+      )}
 
       <div style={{display:"flex",gap:10}}>
         <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
@@ -597,7 +678,7 @@ function TaskCard({ task, onToggle, onEdit }) {
   return (
     <div onClick={onEdit} style={{
       background:flash?p.accent+"22":task.done?T.bg2+"88":T.bg2,
-      border:`1px solid ${task.done?T.brdDim:T.brd}`,
+      border:`1px solid ${task.done?T.brdDim:task.rolledOver?"#F5A62355":T.brd}`,
       borderRadius:13,padding:"13px 14px",
       display:"flex",alignItems:"center",gap:12,
       transition:"all 0.3s ease",opacity:task.done?0.6:1,
@@ -627,6 +708,26 @@ function TaskCard({ task, onToggle, onEdit }) {
           <PeriodBadge period={task.period} small/>
           <span style={{fontSize:11,color:T.gold,fontWeight:700}}>+{task.xp} XP</span>
           {task.recurring && <span style={{fontSize:10,color:T.dim}}>🔄</span>}
+          {/* Streak badge */}
+          {task.streakEnabled && task.streak > 0 && (
+            <span style={{
+              fontSize:11,fontWeight:800,
+              color:"#FF6B35",
+              background:"#FF6B3522",
+              border:"1px solid #FF6B3544",
+              padding:"1px 7px",borderRadius:20,
+              display:"flex",alignItems:"center",gap:3,
+            }}>
+              🔥 {task.streak}
+            </span>
+          )}
+          {task.streakEnabled && task.streak === 0 && !task.done && (
+            <span style={{fontSize:10,color:T.dim,fontWeight:600}}>🔥 серия</span>
+          )}
+          {/* Rolled-over indicator */}
+          {task.rolledOver && !task.done && (
+            <span style={{fontSize:10,color:T.gold,fontWeight:600}}>↩ перенесено</span>
+          )}
           {task.dueDate && task.dueDate!==today && (
             <span style={{fontSize:10,color:T.sub}}>📅 {fmtDate(task.dueDate)}</span>
           )}
@@ -926,7 +1027,12 @@ function ProfileScreen({ xp, tasks, events }) {
     {icon:"👑",label:"Годовой план",  desc:"Добавь годовую цель",       done:tasks.some(t=>t.period==="year")},
     {icon:"🎂",label:"Не забуду",     desc:"Добавь день рождения",      done:events.some(e=>e.isBirthday)},
     {icon:"🔄",label:"Привычка",      desc:"Создай повторяемую задачу", done:tasks.some(t=>t.recurring)},
+    {icon:"🔥",label:"Серийщик",      desc:"Серия 7 дней подряд",       done:tasks.some(t=>t.streak>=7)},
+    {icon:"💪",label:"Легенда серии", desc:"Серия 30 дней подряд",      done:tasks.some(t=>t.streak>=30)},
   ];
+
+  // Best streak across all tasks
+  const bestStreak = Math.max(0, ...tasks.filter(t=>t.streakEnabled).map(t=>t.streak||0));
 
   return (
     <div style={{flex:1,overflowY:"auto",padding:"14px 16px",WebkitOverflowScrolling:"touch"}}>
@@ -962,10 +1068,10 @@ function ProfileScreen({ xp, tasks, events }) {
       {/* Stats */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
         {[
-          {label:"Выполнено",     value:completed,                         icon:"✅",color:T.teal},
-          {label:"Всего квестов", value:total,                             icon:"📜",color:T.sky},
-          {label:"Событий",       value:events.length,                     icon:"📅",color:T.purpL},
-          {label:"Дней рождений", value:events.filter(e=>e.isBirthday).length,icon:"🎂",color:T.gold},
+          {label:"Выполнено",     value:completed,                                   icon:"✅",color:T.teal},
+          {label:"Всего квестов", value:total,                                       icon:"📜",color:T.sky},
+          {label:"Событий",       value:events.length,                               icon:"📅",color:T.purpL},
+          {label:"Лучшая серия",  value:bestStreak>0?`${bestStreak} 🔥`:"—",         icon:"🏆",color:"#FF6B35"},
         ].map(s=>(
           <div key={s.label} style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:13,padding:"14px 16px"}}>
             <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
@@ -1027,9 +1133,12 @@ export default function App() {
   const [lvlUpAnim,setLvlUp] = useState(false);
   const prevLvlRef = useRef(lvlOf(saved?.xp??340));
 
-  // Spawn recurring tasks once on mount
+  // On mount: rollover overdue tasks, then spawn recurring instances for today
   useEffect(() => {
-    setTasks(prev => spawnRecurring(prev, events, today));
+    setTasks(prev => {
+      const rolled = autoRollover(prev);
+      return spawnRecurring(rolled, events, today);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1043,6 +1152,8 @@ export default function App() {
     setTasks(prev => prev.map(t => {
       if (t.id!==id) return t;
       if (!t.done) {
+        // Completing: increment streak if enabled
+        const newStreak = t.streakEnabled ? (t.streak || 0) + 1 : (t.streak || 0);
         setXP(prev => {
           const newXP = prev + t.xp;
           const newLvl = lvlOf(newXP);
@@ -1054,8 +1165,11 @@ export default function App() {
         });
         setXPAnim({amount:t.xp});
         setTimeout(()=>setXPAnim(null),2200);
+        return {...t, done:true, streak:newStreak};
       }
-      return {...t,done:!t.done};
+      // Uncompleting: decrement streak back (undo)
+      const prevStreak = t.streakEnabled ? Math.max(0, (t.streak||0) - 1) : (t.streak||0);
+      return {...t, done:false, streak:prevStreak};
     }));
   },[]);
 
