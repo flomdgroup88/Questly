@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { cloudSave, cloudFind, cloudAddParticipant, cloudGetParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants } from "./firebase.js";
+import OverviewScreen from "./OverviewScreen.jsx";
 
 // ─── TELEGRAM WEBAPP INIT ─────────────────────────────────────────
 const tg = typeof window !== "undefined" && window.Telegram?.WebApp;
@@ -91,6 +92,17 @@ const nextXP = xp => { const l = lvlOf(xp); return l >= RANKS.length ? 0 : (XP_T
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const fmtDate  = s => { const [y,m,d] = s.split("-"); return `${d}.${m}.${y}`; };
 const uid      = () => `q${Date.now().toString(36)}${Math.random().toString(36).slice(2,5)}`;
+
+const endOfWeek  = () => { const d=new Date(); const dow=d.getDay(); const diff=dow===0?0:7-dow; d.setDate(d.getDate()+diff); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const endOfMonth = () => { const d=new Date(); d.setMonth(d.getMonth()+1,0); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const endOfYear  = () => { const d=new Date(); return `${d.getFullYear()}-12-31`; };
+const defaultDueForPeriod = p => p==="week"?endOfWeek():p==="month"?endOfMonth():p==="year"?endOfYear():todayStr();
+
+const isInCurrentWeek  = s => { const d=new Date(s+"T12:00:00"); const now=new Date(); const dow=now.getDay(); const mon=new Date(now); mon.setDate(now.getDate()-(dow===0?6:dow-1)); mon.setHours(0,0,0,0); const sun=new Date(mon); sun.setDate(mon.getDate()+6); sun.setHours(23,59,59,999); return d>=mon&&d<=sun; };
+const isInCurrentMonth = s => { const d=new Date(s+"T12:00:00"); const now=new Date(); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); };
+const isInCurrentYear  = s => { const d=new Date(s+"T12:00:00"); return d.getFullYear()===new Date().getFullYear(); };
+
+const daysLeft = s => { const d=new Date(s+"T23:59:59"); const now=new Date(); const diff=Math.ceil((d-now)/86400000); if(diff<0)return"просрочено"; if(diff===0)return"сегодня"; return`${diff} дн.`; };
 
 const isBdTitle = t => /\bдр\b|день рождения|днюха|birthday/i.test(t);
 const bdName    = t => { const m = t.match(/(?:др|день рождения|днюха|birthday)[:\s]+(.+)/i)||t.match(/(.+?)[\s,–-]+(?:др|день рождения|днюха)/i); return m?m[1].trim():t.trim(); };
@@ -247,7 +259,19 @@ const EVENT_TYPES = [
   },
 ];
 
-// ─── AUTO ROLLOVER ────────────────────────────────────────────────
+// ─── CHECKLIST PRESETS ────────────────────────────────────────────
+const CHECKLIST_PRESETS = [
+  { id:"shop",     icon:"🛒", label:"Покупки"   },
+  { id:"travel",   icon:"🧳", label:"В дорогу"  },
+  { id:"guests",   icon:"👥", label:"Гости"     },
+  { id:"gifts",    icon:"🎁", label:"Подарки"   },
+  { id:"movies",   icon:"🎬", label:"Фильмы"    },
+  { id:"books",    icon:"📚", label:"Книги"     },
+  { id:"series",   icon:"📺", label:"Сериалы"   },
+  { id:"custom",   icon:"✏️", label:"Своё"      },
+];
+
+
 // Non-recurring unfinished tasks from past periods → moved to today
 // Recurring tasks: handled by spawnRecurring (new instance each period)
 // Streak resets if a recurring task is missed (determined at spawn time)
@@ -312,7 +336,7 @@ const spawnRecurring = (tasks, events, day) => {
       if (!next.some(x => x.title===tmpl.title && x.dueDate===day))
         next.unshift({id:uid(), done:false, period:"day", xp:tmpl.xp||15,
           dueDate:day, recurring:true, recurType:ev.recurType,
-          streakEnabled:false, streak:0, ...tmpl});
+          streakEnabled:false, streak:0, eventId:ev.id, ...tmpl});
     });
   });
   return next;
@@ -375,8 +399,23 @@ function ModalOverlay({ onClose, children }) {
         border:`1px solid ${T.brd}`,borderBottom:"none",
         animation:"slideUp 0.32s cubic-bezier(.34,1.56,.64,1)",
         maxHeight:"90vh",overflowY:"auto",
+        position:"relative",
       }}>
+        {/* Drag handle */}
         <div style={{width:40,height:4,borderRadius:2,background:T.brd,margin:"8px auto 16px"}}/>
+        {/* Close button */}
+        <div onClick={onClose} style={{
+          position:"absolute",top:14,right:14,
+          width:32,height:32,borderRadius:"50%",
+          background:T.bg3,border:`1px solid ${T.brd}`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          cursor:"pointer",fontSize:18,color:T.sub,fontWeight:400,
+          lineHeight:1,zIndex:10,flexShrink:0,
+          transition:"background 0.15s, color 0.15s",
+        }}
+        onMouseEnter={e=>{e.currentTarget.style.background=T.rose+"33";e.currentTarget.style.color=T.rose;}}
+        onMouseLeave={e=>{e.currentTarget.style.background=T.bg3;e.currentTarget.style.color=T.sub;}}
+        >×</div>
         {children}
       </div>
     </div>
@@ -434,25 +473,30 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
   const isEdit = !!existing;
   const [title,    setTitle]  = useState(existing?.title    ?? "");
   const [period,   setPeriod] = useState(existing?.period   ?? "day");
-  const [dueDate,  setDate]   = useState(existing?.dueDate  ?? today);
+  const [dueDate,  setDate]   = useState(existing?.dueDate  ?? defaultDueForPeriod(existing?.period ?? "day"));
   const [recurring,setRec]    = useState(existing?.recurring ?? false);
   const [recurType,setRT]     = useState(existing?.recurType ?? "day");
   const [streakEnabled, setStreak] = useState(existing?.streakEnabled ?? false);
   const [bulkMode, setBulk]   = useState(false);
   const [bulkText, setBulkText] = useState("");
-  // Shopping list
-  const [isShopping, setIsShopping] = useState(!!(existing?.shopItems));
+  // Checklist (formerly "shopping list")
+  const [hasChecklist, setHasChecklist] = useState(!!(existing?.shopItems?.length));
+  const [checkPresetId, setCheckPresetId] = useState(existing?.checklistPresetId || "shop");
+  const [checklistIcon, setCheckIcon] = useState(existing?.checklistIcon || "🛒");
+  const [checklistName, setCheckName] = useState(existing?.checklistName || "Покупки");
+  const [customEmoji,  setCustomEmoji]  = useState(existing?.checklistIcon || "");
+  const [customLabel,  setCustomLabel]  = useState(existing?.checklistName || "");
   const [shopItems,  setShopItems]  = useState(existing?.shopItems ?? []);
   const [shopInput,  setShopInput]  = useState("");
 
-  const handleSetRec = v => { setRec(v); if (!v) setStreak(false); };
-
-  const addShopItem = () => {
-    if (!shopInput.trim()) return;
-    setShopItems(p=>[...p,{id:uid(),title:shopInput.trim(),done:false}]);
-    setShopInput("");
+  const pickPreset = p => {
+    setCheckPresetId(p.id);
+    if (p.id !== "custom") { setCheckIcon(p.icon); setCheckName(p.label); }
+    else { setCheckIcon(customEmoji||"📋"); setCheckName(customLabel||"Список"); }
   };
-  const removeShopItem = id => setShopItems(p=>p.filter(x=>x.id!==id));
+
+  const handleSetRec = v => { setRec(v); if (!v) setStreak(false); };
+  const handlePeriodChange = p => { setPeriod(p); if (!isEdit) setDate(defaultDueForPeriod(p)); };
 
   const submit = () => {
     const p = PERIODS.find(x=>x.id===period);
@@ -467,7 +511,12 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
     onSave({
       id:existing?.id??uid(), title:title.trim(), period, done:existing?.done??false,
       xp:p.xp, dueDate, recurring, recurType, streakEnabled, streak:existing?.streak??0,
-      ...(isShopping && period==="day" ? {shopItems} : {}),
+      ...(hasChecklist && period==="day" ? {
+        shopItems,
+        checklistIcon: checkPresetId==="custom" ? (customEmoji||"📋") : checklistIcon,
+        checklistName: checkPresetId==="custom" ? (customLabel||"Список") : checklistName,
+        checklistPresetId: checkPresetId,
+      } : {}),
     });
     onClose();
   };
@@ -525,7 +574,7 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
         <SectionLabel>Период</SectionLabel>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           {PERIODS.map(p=>(
-            <div key={p.id} onClick={()=>setPeriod(p.id)} style={{
+            <div key={p.id} onClick={()=>handlePeriodChange(p.id)} style={{
               padding:"10px 12px",borderRadius:11,cursor:"pointer",
               border:`2px solid ${period===p.id?p.accent:T.brd}`,
               background:period===p.id?p.accent+"20":T.bg0,transition:"all 0.15s",
@@ -537,68 +586,125 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
         </div>
       </div>
 
-      {/* 🛒 Shopping list — only for daily tasks */}
+      {/* 📋 Checklist — only for daily tasks */}
       {period==="day" && !bulkMode && (
         <div style={{marginBottom:14}}>
+          {/* Toggle header */}
           <div style={{
             display:"flex",alignItems:"center",justifyContent:"space-between",
             background:T.bg0,padding:"11px 14px",borderRadius:11,
-            border:`1px solid ${isShopping?"#F5A62355":T.brd}`,
-            marginBottom:isShopping?10:0,transition:"border-color 0.2s",cursor:"pointer",
-          }} onClick={()=>setIsShopping(v=>!v)}>
+            border:`1px solid ${hasChecklist?(checkPresetId==="custom"?(customEmoji?"#8B5CF655":T.brd):checklistIcon?"#8B5CF655":T.brd):T.brd}`,
+            marginBottom:hasChecklist?10:0,transition:"border-color 0.2s",cursor:"pointer",
+          }} onClick={()=>setHasChecklist(v=>!v)}>
             <div>
-              <span style={{fontSize:14,color:T.text}}>🛒 Список покупок</span>
-              {isShopping && (
-                <div style={{fontSize:11,color:T.gold,marginTop:3,fontWeight:600}}>
+              <span style={{fontSize:14,color:T.text}}>
+                {hasChecklist ? `${checkPresetId==="custom"?(customEmoji||"📋"):checklistIcon} ${checkPresetId==="custom"?(customLabel||"Список"):checklistName}` : "📋 Добавить чеклист"}
+              </span>
+              {hasChecklist && (
+                <div style={{fontSize:11,color:T.purpL,marginTop:3,fontWeight:600}}>
                   Отмечай пункты прямо в задаче
                 </div>
               )}
             </div>
-            <Toggle value={isShopping} onChange={setIsShopping}/>
+            <Toggle value={hasChecklist} onChange={setHasChecklist}/>
           </div>
 
-          {isShopping && (
+          {hasChecklist && (
             <div style={{background:T.bg0,border:`1px solid ${T.brd}`,borderRadius:11,padding:"12px 14px"}}>
+              {/* Preset grid */}
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:11,color:T.sub,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,marginBottom:8}}>Тип списка</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+                  {CHECKLIST_PRESETS.map(p=>(
+                    <div key={p.id} onClick={()=>pickPreset(p)} style={{
+                      padding:"8px 4px",borderRadius:9,cursor:"pointer",textAlign:"center",
+                      border:`1.5px solid ${checkPresetId===p.id?T.purp:T.brd}`,
+                      background:checkPresetId===p.id?T.purp+"33":T.bg2,
+                      transition:"all 0.15s",
+                    }}>
+                      <div style={{fontSize:18,lineHeight:1,marginBottom:2}}>{p.icon}</div>
+                      <div style={{fontSize:9,fontWeight:700,color:checkPresetId===p.id?T.purpL:T.sub,lineHeight:1.2}}>{p.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom name + emoji inputs */}
+              {checkPresetId==="custom" && (
+                <div style={{display:"flex",gap:8,marginBottom:10}}>
+                  <input
+                    value={customEmoji}
+                    onChange={e=>{setCustomEmoji(e.target.value.slice(-2));setCheckIcon(e.target.value.slice(-2)||"📋");}}
+                    placeholder="😊"
+                    style={{
+                      width:48,padding:"9px 8px",background:T.bg2,textAlign:"center",
+                      border:`1px solid ${T.purp}`,borderRadius:9,
+                      color:T.text,fontSize:18,outline:"none",colorScheme:"dark",flexShrink:0,
+                    }}
+                  />
+                  <input
+                    value={customLabel}
+                    onChange={e=>{setCustomLabel(e.target.value);setCheckName(e.target.value||"Список");}}
+                    placeholder="Название списка…"
+                    style={{
+                      flex:1,padding:"9px 12px",background:T.bg2,
+                      border:`1px solid ${T.purp}`,borderRadius:9,
+                      color:T.text,fontSize:14,outline:"none",colorScheme:"dark",
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Items input */}
               <div style={{display:"flex",gap:8,marginBottom:10}}>
                 <input
                   value={shopInput}
                   onChange={e=>setShopInput(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&addShopItem()}
-                  placeholder="Молоко, хлеб, сыр…"
+                  onKeyDown={e=>{if(e.key==="Enter"){if(!shopInput.trim())return;setShopItems(p=>[...p,{id:uid(),title:shopInput.trim(),done:false}]);setShopInput("");}}}
+                  placeholder={
+                    checkPresetId==="travel"?"Паспорт, зарядка, наушники…":
+                    checkPresetId==="guests"?"Маша, Петя, Света…":
+                    checkPresetId==="gifts"?"Цветы, книга, конфеты…":
+                    checkPresetId==="movies"?"Интерстеллар, Дюна…":
+                    checkPresetId==="books"?"Война и мир, Дюна…":
+                    checkPresetId==="series"?"Черное зеркало, Шерлок…":
+                    "Добавить пункт…"
+                  }
                   style={{
                     flex:1,padding:"9px 12px",background:T.bg2,
                     border:`1px solid ${T.brd}`,borderRadius:9,
                     color:T.text,fontSize:14,outline:"none",colorScheme:"dark",
                   }}
                 />
-                <div onClick={addShopItem} style={{
+                <div onClick={()=>{if(!shopInput.trim())return;setShopItems(p=>[...p,{id:uid(),title:shopInput.trim(),done:false}]);setShopInput("");}} style={{
                   width:38,height:38,borderRadius:9,
-                  background:T.gold+"33",border:`1px solid ${T.gold}66`,
+                  background:T.purp+"33",border:`1px solid ${T.purp}66`,
                   display:"flex",alignItems:"center",justifyContent:"center",
-                  cursor:"pointer",fontSize:18,color:T.gold,flexShrink:0,
+                  cursor:"pointer",fontSize:18,color:T.purpL,flexShrink:0,
                 }}>+</div>
               </div>
-              {shopItems.length===0 && (
-                <div style={{fontSize:12,color:T.dim,textAlign:"center",padding:"6px 0"}}>
-                  Добавь пункты 👆
-                </div>
+
+              {shopItems.length===0 ? (
+                <div style={{fontSize:12,color:T.dim,textAlign:"center",padding:"4px 0"}}>Добавь пункты 👆</div>
+              ) : (
+                shopItems.map((it,i)=>(
+                  <div key={it.id} style={{
+                    display:"flex",alignItems:"center",gap:8,
+                    padding:"7px 4px",
+                    borderBottom:i<shopItems.length-1?`1px solid ${T.brdDim}`:"none",
+                  }}>
+                    <span style={{fontSize:14,marginRight:2}}>{checkPresetId==="custom"?(customEmoji||"📋"):checklistIcon}</span>
+                    <span style={{fontSize:13,color:T.text,flex:1}}>{it.title}</span>
+                    <div onClick={()=>setShopItems(p=>p.filter(x=>x.id!==it.id))} style={{
+                      fontSize:13,color:T.rose,cursor:"pointer",padding:"2px 8px",
+                      borderRadius:6,background:T.rose+"11",
+                    }}>✕</div>
+                  </div>
+                ))
               )}
-              {shopItems.map((it,i)=>(
-                <div key={it.id} style={{
-                  display:"flex",alignItems:"center",gap:8,
-                  padding:"8px 4px",
-                  borderBottom:i<shopItems.length-1?`1px solid ${T.brdDim}`:"none",
-                }}>
-                  <span style={{fontSize:13,color:T.text,flex:1}}>🛒 {it.title}</span>
-                  <div onClick={()=>removeShopItem(it.id)} style={{
-                    fontSize:13,color:T.rose,cursor:"pointer",padding:"2px 8px",
-                    borderRadius:6,background:T.rose+"11",
-                  }}>✕</div>
-                </div>
-              ))}
               {shopItems.length>0 && (
-                <div style={{fontSize:11,color:T.gold,marginTop:8,fontWeight:600,textAlign:"center"}}>
-                  {shopItems.length} пункт(ов) в списке
+                <div style={{fontSize:11,color:T.purpL,marginTop:8,fontWeight:600,textAlign:"center"}}>
+                  {shopItems.length} {shopItems.length===1?"пункт":"пункт(ов)"} в списке
                 </div>
               )}
             </div>
@@ -701,6 +807,7 @@ function EventModal({ onClose, onCreate, onUpdate, onDelete, defaultDate, existi
       dueDate: t.dueDate || date,
       recurring: rec && !["trip"].includes(evType.id),
       recurType: rec && !["trip"].includes(evType.id) ? rt : "",
+      eventId: ev.id,
       ...t,
     }));
     onCreate(ev, autoTasks);
@@ -905,28 +1012,33 @@ function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
             {task.rolledOver && !task.done && (
               <span style={{fontSize:10,color:T.gold,fontWeight:600}}>↩ перенесено</span>
             )}
-            {task.dueDate && task.dueDate!==today && (
+            {task.dueDate && task.dueDate!==today && task.period==="day" && (
               <span style={{fontSize:10,color:T.sub}}>📅 {fmtDate(task.dueDate)}</span>
             )}
-            {/* Shopping badge */}
+            {task.dueDate && task.period!=="day" && !task.done && (
+              <span style={{fontSize:10,color:daysLeft(task.dueDate)==="просрочено"?T.rose:T.sub}}>
+                ⏳ {daysLeft(task.dueDate)}
+              </span>
+            )}
+            {/* Checklist badge */}
             {hasShop && (
               <span style={{
-                fontSize:11,fontWeight:700,color:T.gold,
-                background:T.gold+"22",border:`1px solid ${T.gold}44`,
+                fontSize:11,fontWeight:700,color:T.purpL,
+                background:T.purp+"22",border:`1px solid ${T.purp}44`,
                 padding:"1px 7px",borderRadius:20,
-              }}>🛒 {shopDone}/{task.shopItems.length}</span>
+              }}>{task.checklistIcon||"🛒"} {shopDone}/{task.shopItems.length}</span>
             )}
           </div>
         </div>
 
-        {/* Shopping expand button */}
+        {/* Checklist expand button */}
         {hasShop ? (
           <div onClick={e=>{e.stopPropagation();setShopOpen(v=>!v);}} style={{
             width:28,height:28,borderRadius:8,flexShrink:0,
             display:"flex",alignItems:"center",justifyContent:"center",
-            background:shopOpen?T.gold+"33":T.bg3,
-            border:`1px solid ${shopOpen?T.gold+"66":T.brd}`,
-            color:shopOpen?T.gold:T.dim,fontSize:14,cursor:"pointer",
+            background:shopOpen?T.purp+"33":T.bg3,
+            border:`1px solid ${shopOpen?T.purp+"66":T.brd}`,
+            color:shopOpen?T.purpL:T.dim,fontSize:14,cursor:"pointer",
             transition:"all 0.2s",
           }}>{shopOpen?"▲":"▼"}</div>
         ) : (
@@ -934,7 +1046,7 @@ function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
         )}
       </div>
 
-      {/* Shopping list submenu */}
+      {/* Checklist submenu */}
       {hasShop && shopOpen && (
         <div style={{
           background:T.bg1,border:`1px solid ${T.brd}`,
@@ -943,7 +1055,7 @@ function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
           padding:"10px 14px 12px",
         }}>
           <div style={{fontSize:11,color:T.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>
-            🛒 Список покупок — {shopDone} из {task.shopItems.length}
+            {task.checklistIcon||"🛒"} {task.checklistName||"Список покупок"} — {shopDone} из {task.shopItems.length}
           </div>
           <div style={{
             height:4,background:T.brd,borderRadius:2,overflow:"hidden",marginBottom:10,
@@ -951,7 +1063,7 @@ function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
             <div style={{
               height:"100%",borderRadius:2,
               width:`${task.shopItems.length>0?Math.round(shopDone/task.shopItems.length*100):0}%`,
-              background:`linear-gradient(90deg,${T.gold},${T.teal})`,
+              background:`linear-gradient(90deg,${T.purp},${T.teal})`,
               transition:"width 0.4s ease",
             }}/>
           </div>
@@ -992,7 +1104,15 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopToggle }) {
   const [showCreate,setCreate] = useState(false);
   const [editTask,setEdit]   = useState(null);
 
-  const filtered  = tasks.filter(t=>t.period===filter);
+  const filtered  = tasks.filter(t => {
+    if (t.period !== filter) return false;
+    if (!t.dueDate) return filter === "day";
+    if (filter === "day")   return t.dueDate === today;
+    if (filter === "week")  return isInCurrentWeek(t.dueDate);
+    if (filter === "month") return isInCurrentMonth(t.dueDate);
+    if (filter === "year")  return isInCurrentYear(t.dueDate);
+    return true;
+  });
   const done      = filtered.filter(t=>t.done).length;
   const total     = filtered.length;
   const pct       = total>0?done/total:0;
@@ -1263,11 +1383,21 @@ function CalendarScreen({ events, tasks, onAddEvent, onEditEvent, onDeleteEvent 
 }
 
 // ─── PROFILE SCREEN ───────────────────────────────────────────────
-function ProfileScreen({ xp, tasks, events }) {
+function ProfileScreen({ xp, tasks, events, nickname, onSetNickname }) {
   const level=lvlOf(xp), rank=RANKS[Math.min(level-1,RANKS.length-1)];
   const rankIcon=RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)];
   const toNext=nextXP(xp), completed=tasks.filter(t=>t.done).length, total=tasks.length;
   const [showLevelTable, setShowLevelTable] = useState(false);
+  const [editingNick, setEditingNick] = useState(false);
+  const [nickDraft, setNickDraft] = useState(nickname || "");
+
+  const tgName = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name;
+  const displayName = nickname || tgName || "Герой";
+
+  const saveNick = () => {
+    onSetNickname(nickDraft.trim());
+    setEditingNick(false);
+  };
 
   // Best streak across all tasks
   const bestStreak = Math.max(0, ...tasks.filter(t=>t.streakEnabled).map(t=>t.streak||0));
@@ -1337,9 +1467,40 @@ function ProfileScreen({ xp, tasks, events }) {
           <div style={{width:64,height:64,borderRadius:18,background:`linear-gradient(135deg,${T.purpDim},${T.bg3})`,border:`2px solid ${T.purp}66`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:`0 0 20px ${T.purp}44`}}>{rankIcon}</div>
           <div style={{flex:1}}>
             <div style={{fontSize:11,color:T.sub,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700}}>Уровень {level} / 80</div>
-            <div style={{fontSize:22,fontWeight:900,color:T.text,lineHeight:1.1}}>
-              {tg?.initDataUnsafe?.user?.first_name || "Герой"}
-            </div>
+            {editingNick ? (
+              <div style={{display:"flex",gap:6,alignItems:"center",marginTop:4,marginBottom:4}}>
+                <input
+                  autoFocus
+                  value={nickDraft}
+                  onChange={e=>setNickDraft(e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter")saveNick();if(e.key==="Escape")setEditingNick(false);}}
+                  placeholder="Введи ник…"
+                  maxLength={24}
+                  style={{
+                    flex:1,padding:"6px 10px",background:T.bg0,
+                    border:`1px solid ${T.purp}`,borderRadius:9,
+                    color:T.text,fontSize:16,fontWeight:800,outline:"none",
+                    colorScheme:"dark",
+                  }}
+                />
+                <div onClick={saveNick} style={{
+                  padding:"6px 12px",borderRadius:9,cursor:"pointer",
+                  background:T.purp,color:"#fff",fontSize:13,fontWeight:700,flexShrink:0,
+                }}>✓</div>
+              </div>
+            ) : (
+              <div style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}
+                onClick={()=>{setNickDraft(nickname||"");setEditingNick(true);}}>
+                <div style={{fontSize:22,fontWeight:900,color:T.text,lineHeight:1.1}}>
+                  {displayName}
+                </div>
+                <div style={{
+                  fontSize:12,color:T.sub,background:T.bg3,
+                  border:`1px solid ${T.brd}`,borderRadius:6,
+                  padding:"2px 7px",flexShrink:0,
+                }}>✏️</div>
+              </div>
+            )}
             <div style={{fontSize:14,color:T.purpL,fontWeight:600}}>{rank}</div>
           </div>
           <div style={{textAlign:"right"}}>
@@ -1987,6 +2148,7 @@ export default function App() {
   const [xp,     setXP]    = useState(saved?.xp     ?? 340);
   const [tasks,  setTasks] = useState(saved?.tasks   ?? INIT_TASKS);
   const [events, setEvts]  = useState(saved?.events  ?? INIT_EVENTS);
+  const [nickname, setNickname] = useState(saved?.nickname ?? "");
   const [tab,    setTab]   = useState("tasks");
   const [xpAnim,  setXPAnim]  = useState(null);
   const [lvlUpAnim,setLvlUp] = useState(false);
@@ -2005,7 +2167,7 @@ export default function App() {
   }, []);
 
   // Persist on every change
-  useEffect(() => { saveState({xp,tasks,events}); }, [xp,tasks,events]);
+  useEffect(() => { saveState({xp,tasks,events,nickname}); }, [xp,tasks,events,nickname]);
   useEffect(() => { saveSocial({challenges,sharedGoals}); }, [challenges,sharedGoals]);
 
   // ── Social handlers ──────────────────────────────────────────────
@@ -2083,10 +2245,14 @@ export default function App() {
     if(autoTasks?.length) setTasks(p=>[...autoTasks,...p]);
   },[]);
   const handleEditEvent   = useCallback(ev => setEvts(p=>{const i=p.findIndex(e=>e.id===ev.id);if(i===-1)return p;const u=[...p];u[i]={...p[i],...ev};return u;}),[]);
-  const handleDeleteEvent = useCallback(id => setEvts(p=>p.filter(e=>e.id!==id)),[]);
+  const handleDeleteEvent = useCallback(id => {
+    setEvts(p=>p.filter(e=>e.id!==id));
+    setTasks(p=>p.filter(t=>t.eventId!==id));
+  },[]);
 
   const TABS = [
     {id:"tasks",    label:"Квесты",    icon:"⚔️"},
+    {id:"overview", label:"Обзор",     icon:"👁️"},
     {id:"calendar", label:"Календарь", icon:"📅"},
     {id:"social",   label:"Союзники",  icon:"🤝"},
     {id:"profile",  label:"Герой",     icon:"🧙"},
@@ -2160,9 +2326,10 @@ export default function App() {
       {/* Screen */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
         {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete} onShopToggle={handleShopToggle}/>}
+        {tab==="overview" && <OverviewScreen tasks={tasks}/>}
         {tab==="calendar" && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent}/>}
         {tab==="social"   && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg}/>}
-        {tab==="profile"  && <ProfileScreen  xp={xp}        tasks={tasks}           events={events}/>}
+        {tab==="profile"  && <ProfileScreen  xp={xp} tasks={tasks} events={events} nickname={nickname} onSetNickname={setNickname}/>}
       </div>
 
       {/* Bottom nav */}
