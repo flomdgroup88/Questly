@@ -884,7 +884,7 @@ function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
             fontSize:15,fontWeight:500,
             color:task.done?T.sub:T.text,
             textDecoration:task.done?"line-through":"none",
-            whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",
+            wordBreak:"break-word",
             marginBottom:5,
           }}>{task.title}</div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
@@ -1591,10 +1591,12 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
   };
   const join=async()=>{
     if(!result) return;
-    const userName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Друг";
+    const tgUser = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
+    const userName = tgUser?.first_name||"Друг";
+    const tgId = tgUser?.id ? String(tgUser.id) : null;
     if(result.type==="challenge"){
       onJoinCh(result.data);
-      await cloudAddParticipant("challenge", result.data.shareCode, {name:userName,avatar:"👤",streak:0,lastCompleted:null,history:[]});
+      await cloudAddParticipant("challenge", result.data.shareCode, {name:userName,avatar:"👤",streak:0,lastCompleted:null,history:[],...(tgId?{tgId}:{})});
     } else {
       onJoinSg(result.data);
       await cloudAddParticipant("goal", result.data.shareCode, userName);
@@ -1630,8 +1632,10 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
 
 // ─── CHALLENGE DETAIL MODAL ───────────────────────────────────────
 function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
-  // Всегда берём имя из Telegram — не из Firebase, чтобы у каждого было своё имя
-  const myName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||ch._myName||"Ты";
+  // Всегда берём имя и tgId из Telegram — не из Firebase, чтобы у каждого было своё
+  const tgUser = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
+  const myName = tgUser?.first_name||ch._myName||"Ты";
+  const myTgId = tgUser?.id ? String(tgUser.id) : null;
   const myDoneToday = ch.myHistory.includes(today);
   const period = ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно";
   const [freshParts, setFreshParts] = useState(ch.participants||[]);
@@ -1645,7 +1649,11 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
       ? cloudDeduplicateParticipants(ch.shareCode).then(()=>cloudGetParticipants(ch.shareCode))
       : cloudGetParticipants(ch.shareCode);
     fetchParts.then(parts=>{
-      setFreshParts(parts.filter(p=>p.name!==myName));
+      // Фильтруем себя: по tgId если есть, иначе по имени
+      const others = myTgId
+        ? parts.filter(p => p.tgId ? p.tgId !== myTgId : p.name !== myName)
+        : parts.filter(p => p.name !== myName);
+      setFreshParts(others);
       setSyncing(false);
     }).catch(()=>setSyncing(false));
   };
@@ -1800,11 +1808,15 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
 
   // При загрузке экрана — подтягиваем свежих участников из Firebase для всех соревнований
   useEffect(()=>{
-    const myName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Ты";
+    const tgUser = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
+    const myName = tgUser?.first_name||"Ты";
+    const myTgId = tgUser?.id ? String(tgUser.id) : null;
     challenges.forEach(ch=>{
       if(!ch.shareCode) return;
       cloudGetParticipants(ch.shareCode).then(parts=>{
-        const others = parts.filter(p=>p.name!==myName);
+        const others = myTgId
+          ? parts.filter(p => p.tgId ? p.tgId !== myTgId : p.name !== myName)
+          : parts.filter(p=>p.name!==myName);
         onUpdateCh(ch.id, c=>({...c, participants:others}));
       }).catch(()=>{});
     });
@@ -1828,8 +1840,10 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
         }
       }
       // Синхронизируем прогресс в Firebase — чтобы друг видел обновление
-      const myName = ch._myName || "Ты";
-      if(ch.shareCode) cloudUpdateMyProgress(ch.shareCode, myName, streak, newHistory);
+      const tgUser2 = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
+      const myName = ch._myName || tgUser2?.first_name || "Ты";
+      const myTgId2 = tgUser2?.id ? String(tgUser2.id) : null;
+      if(ch.shareCode) cloudUpdateMyProgress(ch.shareCode, myName, streak, newHistory, myTgId2);
       return {...ch, myHistory:newHistory, myStreak:streak};
     });
   };
@@ -2000,11 +2014,13 @@ export default function App() {
   const handleDeleteCh = useCallback(id => setChallenges(p=>p.filter(c=>c.id!==id)), []);
   const handleDeleteSg = useCallback(id => setSharedGoals(p=>p.filter(s=>s.id!==id)), []);
   const handleCreateCh = useCallback(ch => {
-    const myName = ch._myName || "Создатель";
+    const tgUser = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
+    const myName = ch._myName || tgUser?.first_name || "Создатель";
+    const myTgId = tgUser?.id ? String(tgUser.id) : null;
     // Сохраняем создателя как участника в Firebase (чтобы друг его видел)
     const chWithCreator = {
       ...ch,
-      participants: [{ name: myName, avatar: "🧙", streak: 0, history: [], lastCompleted: null }],
+      participants: [{ name: myName, avatar: "🧙", streak: 0, history: [], lastCompleted: null, ...(myTgId?{tgId:myTgId}:{}) }],
     };
     setChallenges(p=>[ch,...p]);
     cloudSave("challenges", chWithCreator).then(ok => {
