@@ -42,16 +42,12 @@ export async function cloudSave(type, item) {
 // ─── Найти по коду (ищем и в challenges, и в sharedGoals) ────────
 export async function cloudFind(code) {
   const c = code.trim().toUpperCase();
-  try {
-    const chSnap = await getDoc(doc(db, "challenges", c));
-    if (chSnap.exists()) return { type: "challenge", data: chSnap.data() };
-    const sgSnap = await getDoc(doc(db, "sharedGoals", c));
-    if (sgSnap.exists()) return { type: "goal", data: sgSnap.data() };
-    return null;
-  } catch (e) {
-    console.warn("Firebase find error:", e);
-    return null;
-  }
+  // Ошибки НЕ перехватываем — пусть JoinModal покажет правильное сообщение
+  const chSnap = await getDoc(doc(db, "challenges", c));
+  if (chSnap.exists()) return { type: "challenge", data: chSnap.data() };
+  const sgSnap = await getDoc(doc(db, "sharedGoals", c));
+  if (sgSnap.exists()) return { type: "goal", data: sgSnap.data() };
+  return null;
 }
 
 // ─── Добавить участника к существующему соревнованию ─────────────

@@ -1637,8 +1637,18 @@ export default function App() {
   const handleUpdateSg = useCallback((id, updFn) => setSharedGoals(p=>p.map(s=>s.id===id?updFn(s):s)), []);
   const handleDeleteCh = useCallback(id => setChallenges(p=>p.filter(c=>c.id!==id)), []);
   const handleDeleteSg = useCallback(id => setSharedGoals(p=>p.filter(s=>s.id!==id)), []);
-  const handleCreateCh = useCallback(ch => { setChallenges(p=>[ch,...p]); cloudSave("challenges", ch); }, []);
-  const handleCreateSg = useCallback(sg => { setSharedGoals(p=>[sg,...p]); cloudSave("sharedGoals", sg); }, []);
+  const handleCreateCh = useCallback(ch => {
+    setChallenges(p=>[ch,...p]);
+    cloudSave("challenges", ch).then(ok => {
+      if (!ok) console.error("⚠️ Не удалось сохранить соревнование в облако. Проверь правила Firestore.");
+    });
+  }, []);
+  const handleCreateSg = useCallback(sg => {
+    setSharedGoals(p=>[sg,...p]);
+    cloudSave("sharedGoals", sg).then(ok => {
+      if (!ok) console.error("⚠️ Не удалось сохранить цель в облако. Проверь правила Firestore.");
+    });
+  }, []);
 
   const level = lvlOf(xp);
 

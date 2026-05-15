@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // challenges и sharedGoals: публичный доступ на чтение и запись
+    // (без аутентификации — для Telegram Mini App)
+    match /challenges/{shareCode} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /sharedGoals/{shareCode} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
