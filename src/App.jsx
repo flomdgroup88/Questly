@@ -500,7 +500,7 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
             value={bulkText}
             onChange={e=>setBulkText(e.target.value)}
             placeholder={"Утренняя зарядка\nПрочитать 20 страниц\nОтправить отчёт..."}
-            autoFocus
+            
             rows={5}
             style={{
               width:"100%",padding:"11px 14px",background:T.bg0,
@@ -512,7 +512,7 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
           />
         ) : (
           <StyledInput value={title} onChange={e=>setTitle(e.target.value)}
-            placeholder="Введите задачу..." autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
+            placeholder="Введите задачу..." onKeyDown={e=>e.key==="Enter"&&submit()}/>
         )}
         {bulkMode && !isEdit && bulkText.trim() && (
           <div style={{fontSize:11,color:T.teal,marginTop:6,fontWeight:600}}>
@@ -773,7 +773,7 @@ function EventModal({ onClose, onCreate, onUpdate, onDelete, defaultDate, existi
             evType?.id==="holiday"  ? "Новый год…" :
             evType?.id==="health"   ? "Приём у врача…" : "Название события…"
           }
-          autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
+          onKeyDown={e=>e.key==="Enter"&&submit()}/>
       </div>
 
       {/* Date */}
@@ -1519,7 +1519,7 @@ function NewChallengeModal({ onClose, onCreate }) {
           {EMOJIS.map(e=><div key={e} onClick={()=>setEmoji(e)} style={{width:38,height:38,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,background:emoji===e?T.purp+"44":T.bg0,border:`2px solid ${emoji===e?T.purp:T.brd}`,transition:"all 0.15s"}}>{e}</div>)}
         </div>
       </div>
-      <div style={{marginBottom:14}}><SectionLabel>Название</SectionLabel><StyledInput value={title} onChange={e=>setTitle(e.target.value)} placeholder="Утренняя зарядка…" autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/></div>
+      <div style={{marginBottom:14}}><SectionLabel>Название</SectionLabel><StyledInput value={title} onChange={e=>setTitle(e.target.value)} placeholder="Утренняя зарядка…" onKeyDown={e=>e.key==="Enter"&&submit()}/></div>
       <div style={{marginBottom:14}}><SectionLabel>Описание (необязательно)</SectionLabel><StyledInput value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Что нужно делать каждый день?"/></div>
       <div style={{marginBottom:18}}><SectionLabel>Периодичность</SectionLabel><RecurPicker value={rt} onChange={setRT}/></div>
       <div style={{display:"flex",gap:10}}>
@@ -1545,7 +1545,7 @@ function NewSharedGoalModal({ onClose, onCreate }) {
     <ModalOverlay onClose={onClose}>
       <h3 style={{margin:"0 0 4px",fontSize:18,fontWeight:800,color:T.teal}}>🎯 Общая цель</h3>
       <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Раздели задачи с другом и выполняйте вместе</p>
-      <div style={{marginBottom:14}}><SectionLabel>Название</SectionLabel><StyledInput value={title} onChange={e=>setTitle(e.target.value)} placeholder="Список покупок / Подготовка к вечеринке…" autoFocus onKeyDown={e=>e.key==="Enter"&&document.getElementById("sg-item-input")?.focus()}/></div>
+      <div style={{marginBottom:14}}><SectionLabel>Название</SectionLabel><StyledInput value={title} onChange={e=>setTitle(e.target.value)} placeholder="Список покупок / Подготовка к вечеринке…" onKeyDown={e=>e.key==="Enter"&&document.getElementById("sg-item-input")?.focus()}/></div>
       <div style={{marginBottom:14}}>
         <SectionLabel>Пункты ({items.length})</SectionLabel>
         <div style={{display:"flex",gap:8,marginBottom:8}}>
