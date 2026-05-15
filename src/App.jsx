@@ -29,9 +29,58 @@ const PERIODS = [
   { id:"year",  label:"Год",    xp:600, accent:T.gold,  icon:"👑", desc:"на год"     },
 ];
 
-const XP_TABLE   = [0,200,500,1000,2000,3500,5500,8500,13000,20000,30000];
-const RANKS      = ["Новобранец","Искатель","Авантюрист","Боец","Воин","Рыцарь","Ветеран","Страж","Мастер","Архимаг","Легенда"];
-const RANK_ICONS = ["🪨","🔍","🗺️","🥊","⚔️","🛡️","🎖️","🏰","📖","🔮","👑"];
+// 80-level progressive XP table: cumulative XP to reach each level
+// Formula: sum(100 * k^2) for k=1..i  → easy early, brutal late
+// Level 2=100 XP, Level 10=~28k, Level 30=~856k, Level 80=~16.7M
+const XP_TABLE = Array.from({length:80}, (_,i) =>
+  i===0 ? 0 : Math.round(100 * i * (i+1) * (2*i+1) / 6)
+);
+
+const RANKS = [
+  // 1-10: Новичок
+  "Новобранец","Послушник","Искатель","Скиталец","Авантюрист",
+  "Наёмник","Боец","Воин","Страж","Рыцарь",
+  // 11-20: Опытный
+  "Ветеран","Мастер","Командир","Защитник","Чемпион",
+  "Герой","Избранный","Легат","Хранитель","Паладин",
+  // 21-30: Продвинутый
+  "Чародей","Заклинатель","Волшебник","Архимаг","Оракул",
+  "Провидец","Пророк","Мудрец","Гуру","Просветлённый",
+  // 31-40: Элита
+  "Верховный страж","Сенешаль","Протектор","Лорд","Властитель",
+  "Маршал","Феникс","Дракон","Полубог","Бессмертный",
+  // 41-50: Легендарный
+  "Миф","Легенда","Апофеоз","Архонт","Немезида",
+  "Величие","Небожитель","Непостижимый","Безграничный","Вечный",
+  // 51-60: Мифический
+  "Запредельный","Трансцендентный","Абсолют","Ультимат","Один",
+  "Высший","Непревзойдённый","Астральный","Космический","Вселенский",
+  // 61-70: Божественный
+  "Надмирный","Первопричина","Предвечный","Примордиальный","Сингулярность",
+  "Бесконечность","Омега","Непознаваемый","Трансцендентность","Квинтэссенция",
+  // 71-80: Запредельный
+  "Надвременный","Первозданный","Незыблемый","Абсолютное Бытие","Альфа и Омега",
+  "Эпохальный","Надсущностный","Внеопытный","Тотальный","Легенда Вечности",
+];
+
+const RANK_ICONS = [
+  // 1-10
+  "🪨","📖","🔍","🗺️","🥊","⚔️","🛡️","🎖️","🏰","👑",
+  // 11-20
+  "🎯","📜","🔱","🌟","🏆","⭐","💫","✨","🌙","🛡",
+  // 21-30
+  "🔮","💫","🌀","🔯","🧿","👁️","🌠","🎓","🧙","💡",
+  // 31-40
+  "⚜️","🌋","🦁","🦅","🌈","⚡","🐉","🔥","🌊","💎",
+  // 41-50
+  "📿","🌌","🌠","⚖️","☄️","🌑","🌃","🌌","♾️","⌛",
+  // 51-60
+  "🌀","🌊","🔥","⚡","🌟","🔯","🏆","🪐","🌍","🌺",
+  // 61-70
+  "🌙","🌞","⭐","💀","🔮","♾️","🧬","⚛️","🌀","🌺",
+  // 71-80
+  "⏳","🌱","🗿","☯️","🌐","🔑","🕊️","🌊","🔥","👑",
+];
 const MONTHS_RU  = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const WDAYS      = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 
@@ -391,9 +440,19 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
   const [streakEnabled, setStreak] = useState(existing?.streakEnabled ?? false);
   const [bulkMode, setBulk]   = useState(false);
   const [bulkText, setBulkText] = useState("");
+  // Shopping list
+  const [isShopping, setIsShopping] = useState(!!(existing?.shopItems));
+  const [shopItems,  setShopItems]  = useState(existing?.shopItems ?? []);
+  const [shopInput,  setShopInput]  = useState("");
 
-  // If recurring toggled off — disable streak too
   const handleSetRec = v => { setRec(v); if (!v) setStreak(false); };
+
+  const addShopItem = () => {
+    if (!shopInput.trim()) return;
+    setShopItems(p=>[...p,{id:uid(),title:shopInput.trim(),done:false}]);
+    setShopInput("");
+  };
+  const removeShopItem = id => setShopItems(p=>p.filter(x=>x.id!==id));
 
   const submit = () => {
     const p = PERIODS.find(x=>x.id===period);
@@ -405,7 +464,11 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
       return;
     }
     if (!title.trim()) return;
-    onSave({ id:existing?.id??uid(), title:title.trim(), period, done:existing?.done??false, xp:p.xp, dueDate, recurring, recurType, streakEnabled, streak:existing?.streak??0 });
+    onSave({
+      id:existing?.id??uid(), title:title.trim(), period, done:existing?.done??false,
+      xp:p.xp, dueDate, recurring, recurType, streakEnabled, streak:existing?.streak??0,
+      ...(isShopping && period==="day" ? {shopItems} : {}),
+    });
     onClose();
   };
 
@@ -474,6 +537,75 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
         </div>
       </div>
 
+      {/* 🛒 Shopping list — only for daily tasks */}
+      {period==="day" && !bulkMode && (
+        <div style={{marginBottom:14}}>
+          <div style={{
+            display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:T.bg0,padding:"11px 14px",borderRadius:11,
+            border:`1px solid ${isShopping?"#F5A62355":T.brd}`,
+            marginBottom:isShopping?10:0,transition:"border-color 0.2s",cursor:"pointer",
+          }} onClick={()=>setIsShopping(v=>!v)}>
+            <div>
+              <span style={{fontSize:14,color:T.text}}>🛒 Список покупок</span>
+              {isShopping && (
+                <div style={{fontSize:11,color:T.gold,marginTop:3,fontWeight:600}}>
+                  Отмечай пункты прямо в задаче
+                </div>
+              )}
+            </div>
+            <Toggle value={isShopping} onChange={setIsShopping}/>
+          </div>
+
+          {isShopping && (
+            <div style={{background:T.bg0,border:`1px solid ${T.brd}`,borderRadius:11,padding:"12px 14px"}}>
+              <div style={{display:"flex",gap:8,marginBottom:10}}>
+                <input
+                  value={shopInput}
+                  onChange={e=>setShopInput(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&addShopItem()}
+                  placeholder="Молоко, хлеб, сыр…"
+                  style={{
+                    flex:1,padding:"9px 12px",background:T.bg2,
+                    border:`1px solid ${T.brd}`,borderRadius:9,
+                    color:T.text,fontSize:14,outline:"none",colorScheme:"dark",
+                  }}
+                />
+                <div onClick={addShopItem} style={{
+                  width:38,height:38,borderRadius:9,
+                  background:T.gold+"33",border:`1px solid ${T.gold}66`,
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  cursor:"pointer",fontSize:18,color:T.gold,flexShrink:0,
+                }}>+</div>
+              </div>
+              {shopItems.length===0 && (
+                <div style={{fontSize:12,color:T.dim,textAlign:"center",padding:"6px 0"}}>
+                  Добавь пункты 👆
+                </div>
+              )}
+              {shopItems.map((it,i)=>(
+                <div key={it.id} style={{
+                  display:"flex",alignItems:"center",gap:8,
+                  padding:"8px 4px",
+                  borderBottom:i<shopItems.length-1?`1px solid ${T.brdDim}`:"none",
+                }}>
+                  <span style={{fontSize:13,color:T.text,flex:1}}>🛒 {it.title}</span>
+                  <div onClick={()=>removeShopItem(it.id)} style={{
+                    fontSize:13,color:T.rose,cursor:"pointer",padding:"2px 8px",
+                    borderRadius:6,background:T.rose+"11",
+                  }}>✕</div>
+                </div>
+              ))}
+              {shopItems.length>0 && (
+                <div style={{fontSize:11,color:T.gold,marginTop:8,fontWeight:600,textAlign:"center"}}>
+                  {shopItems.length} пункт(ов) в списке
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{marginBottom:14}}>
         <SectionLabel>Срок выполнения</SectionLabel>
         <StyledInput type="date" value={dueDate} onChange={e=>setDate(e.target.value)}/>
@@ -489,7 +621,6 @@ function TaskModal({ onClose, onSave, onDelete, existing=null }) {
         <>
           <div style={{marginBottom:10}}><RecurPicker value={recurType} onChange={setRT}/></div>
 
-          {/* Streak toggle — only for recurring tasks */}
           <div style={{
             display:"flex",alignItems:"center",justifyContent:"space-between",
             marginBottom:18,background:T.bg0,padding:"11px 14px",borderRadius:11,
@@ -712,9 +843,10 @@ function EventModal({ onClose, onCreate, onUpdate, onDelete, defaultDate, existi
 }
 
 // ─── TASK CARD ────────────────────────────────────────────────────
-function TaskCard({ task, onToggle, onEdit }) {
+function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
   const p = PERIODS.find(x=>x.id===task.period);
   const [flash, setFlash] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
 
   const handleCheck = e => {
     e.stopPropagation();
@@ -722,71 +854,140 @@ function TaskCard({ task, onToggle, onEdit }) {
     onToggle(task.id);
   };
 
+  const hasShop = task.shopItems && task.shopItems.length > 0;
+  const shopDone = hasShop ? task.shopItems.filter(i=>i.done).length : 0;
+
   return (
-    <div onClick={onEdit} style={{
-      background:flash?p.accent+"22":task.done?T.bg2+"88":T.bg2,
-      border:`1px solid ${task.done?T.brdDim:task.rolledOver?"#F5A62355":T.brd}`,
-      borderRadius:13,padding:"13px 14px",
-      display:"flex",alignItems:"center",gap:12,
-      transition:"all 0.3s ease",opacity:task.done?0.6:1,
-      marginBottom:8,cursor:"pointer",
-    }}>
-      <div onClick={handleCheck} style={{
-        width:30,height:30,borderRadius:"50%",
-        border:`2.5px solid ${task.done?p.accent:T.dim}`,
-        background:task.done?p.accent:"transparent",
-        cursor:"pointer",flexShrink:0,
-        display:"flex",alignItems:"center",justifyContent:"center",
-        transition:"all 0.25s cubic-bezier(.34,1.56,.64,1)",
-        boxShadow:task.done?`0 0 10px ${p.accent}66`:"none",
+    <div style={{marginBottom:8}}>
+      <div onClick={onEdit} style={{
+        background:flash?p.accent+"22":task.done?T.bg2+"88":T.bg2,
+        border:`1px solid ${task.done?T.brdDim:task.rolledOver?"#F5A62355":T.brd}`,
+        borderRadius:shopOpen?"13px 13px 0 0":13,padding:"13px 14px",
+        display:"flex",alignItems:"center",gap:12,
+        transition:"all 0.3s ease",opacity:task.done?0.6:1,
+        cursor:"pointer",
       }}>
-        {task.done && <span style={{fontSize:15,color:"#000",fontWeight:900}}>✓</span>}
+        <div onClick={handleCheck} style={{
+          width:30,height:30,borderRadius:"50%",
+          border:`2.5px solid ${task.done?p.accent:T.dim}`,
+          background:task.done?p.accent:"transparent",
+          cursor:"pointer",flexShrink:0,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          transition:"all 0.25s cubic-bezier(.34,1.56,.64,1)",
+          boxShadow:task.done?`0 0 10px ${p.accent}66`:"none",
+        }}>
+          {task.done && <span style={{fontSize:15,color:"#000",fontWeight:900}}>✓</span>}
+        </div>
+
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{
+            fontSize:15,fontWeight:500,
+            color:task.done?T.sub:T.text,
+            textDecoration:task.done?"line-through":"none",
+            whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",
+            marginBottom:5,
+          }}>{task.title}</div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <PeriodBadge period={task.period} small/>
+            <span style={{fontSize:11,color:T.gold,fontWeight:700}}>+{task.xp} XP</span>
+            {task.recurring && <span style={{fontSize:10,color:T.dim}}>🔄</span>}
+            {task.streakEnabled && task.streak > 0 && (
+              <span style={{
+                fontSize:11,fontWeight:800,color:"#FF6B35",
+                background:"#FF6B3522",border:"1px solid #FF6B3544",
+                padding:"1px 7px",borderRadius:20,
+                display:"flex",alignItems:"center",gap:3,
+              }}>🔥 {task.streak}</span>
+            )}
+            {task.streakEnabled && task.streak === 0 && !task.done && (
+              <span style={{fontSize:10,color:T.dim,fontWeight:600}}>🔥 серия</span>
+            )}
+            {task.rolledOver && !task.done && (
+              <span style={{fontSize:10,color:T.gold,fontWeight:600}}>↩ перенесено</span>
+            )}
+            {task.dueDate && task.dueDate!==today && (
+              <span style={{fontSize:10,color:T.sub}}>📅 {fmtDate(task.dueDate)}</span>
+            )}
+            {/* Shopping badge */}
+            {hasShop && (
+              <span style={{
+                fontSize:11,fontWeight:700,color:T.gold,
+                background:T.gold+"22",border:`1px solid ${T.gold}44`,
+                padding:"1px 7px",borderRadius:20,
+              }}>🛒 {shopDone}/{task.shopItems.length}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Shopping expand button */}
+        {hasShop ? (
+          <div onClick={e=>{e.stopPropagation();setShopOpen(v=>!v);}} style={{
+            width:28,height:28,borderRadius:8,flexShrink:0,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            background:shopOpen?T.gold+"33":T.bg3,
+            border:`1px solid ${shopOpen?T.gold+"66":T.brd}`,
+            color:shopOpen?T.gold:T.dim,fontSize:14,cursor:"pointer",
+            transition:"all 0.2s",
+          }}>{shopOpen?"▲":"▼"}</div>
+        ) : (
+          <span style={{color:T.dim,fontSize:18,flexShrink:0}}>›</span>
+        )}
       </div>
 
-      <div style={{flex:1,minWidth:0}}>
+      {/* Shopping list submenu */}
+      {hasShop && shopOpen && (
         <div style={{
-          fontSize:15,fontWeight:500,
-          color:task.done?T.sub:T.text,
-          textDecoration:task.done?"line-through":"none",
-          whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",
-          marginBottom:5,
-        }}>{task.title}</div>
-        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <PeriodBadge period={task.period} small/>
-          <span style={{fontSize:11,color:T.gold,fontWeight:700}}>+{task.xp} XP</span>
-          {task.recurring && <span style={{fontSize:10,color:T.dim}}>🔄</span>}
-          {/* Streak badge */}
-          {task.streakEnabled && task.streak > 0 && (
-            <span style={{
-              fontSize:11,fontWeight:800,
-              color:"#FF6B35",
-              background:"#FF6B3522",
-              border:"1px solid #FF6B3544",
-              padding:"1px 7px",borderRadius:20,
-              display:"flex",alignItems:"center",gap:3,
-            }}>
-              🔥 {task.streak}
-            </span>
-          )}
-          {task.streakEnabled && task.streak === 0 && !task.done && (
-            <span style={{fontSize:10,color:T.dim,fontWeight:600}}>🔥 серия</span>
-          )}
-          {/* Rolled-over indicator */}
-          {task.rolledOver && !task.done && (
-            <span style={{fontSize:10,color:T.gold,fontWeight:600}}>↩ перенесено</span>
-          )}
-          {task.dueDate && task.dueDate!==today && (
-            <span style={{fontSize:10,color:T.sub}}>📅 {fmtDate(task.dueDate)}</span>
-          )}
+          background:T.bg1,border:`1px solid ${T.brd}`,
+          borderTop:`1px solid ${T.brd}`,
+          borderRadius:"0 0 13px 13px",
+          padding:"10px 14px 12px",
+        }}>
+          <div style={{fontSize:11,color:T.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>
+            🛒 Список покупок — {shopDone} из {task.shopItems.length}
+          </div>
+          <div style={{
+            height:4,background:T.brd,borderRadius:2,overflow:"hidden",marginBottom:10,
+          }}>
+            <div style={{
+              height:"100%",borderRadius:2,
+              width:`${task.shopItems.length>0?Math.round(shopDone/task.shopItems.length*100):0}%`,
+              background:`linear-gradient(90deg,${T.gold},${T.teal})`,
+              transition:"width 0.4s ease",
+            }}/>
+          </div>
+          {task.shopItems.map((it,i) => (
+            <div key={it.id} onClick={e=>{e.stopPropagation();onShopToggle&&onShopToggle(task.id,it.id);}}
+              style={{
+                display:"flex",alignItems:"center",gap:10,
+                padding:"9px 10px",borderRadius:9,cursor:"pointer",
+                background:it.done?T.teal+"12":T.bg0,
+                border:`1px solid ${it.done?T.teal+"44":T.brdDim}`,
+                marginBottom:i<task.shopItems.length-1?6:0,
+                transition:"all 0.2s",
+              }}>
+              <div style={{
+                width:22,height:22,borderRadius:"50%",flexShrink:0,
+                border:`2px solid ${it.done?T.teal:T.dim}`,
+                background:it.done?T.teal:"transparent",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:12,color:"#000",fontWeight:900,
+                transition:"all 0.2s",
+              }}>{it.done&&"✓"}</div>
+              <span style={{
+                fontSize:14,flex:1,
+                color:it.done?T.sub:T.text,
+                textDecoration:it.done?"line-through":"none",
+              }}>{it.title}</span>
+            </div>
+          ))}
         </div>
-      </div>
-      <span style={{color:T.dim,fontSize:18,flexShrink:0}}>›</span>
+      )}
     </div>
   );
 }
 
 // ─── TASKS SCREEN ─────────────────────────────────────────────────
-function TasksScreen({ tasks, onToggle, onSave, onDelete }) {
+function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopToggle }) {
   const [filter,setFilter]   = useState("day");
   const [showCreate,setCreate] = useState(false);
   const [editTask,setEdit]   = useState(null);
@@ -852,13 +1053,13 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete }) {
         ) : (
           <>
             {filtered.filter(t=>!t.done).map(t=>(
-              <TaskCard key={t.id} task={t} onToggle={onToggle} onEdit={()=>setEdit(t)}/>
+              <TaskCard key={t.id} task={t} onToggle={onToggle} onEdit={()=>setEdit(t)} onShopToggle={onShopToggle}/>
             ))}
             {filtered.some(t=>t.done) && (
               <div style={{marginTop:12}}>
                 <div style={{fontSize:11,color:T.dim,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8,fontWeight:700}}>✓ Выполнено</div>
                 {filtered.filter(t=>t.done).map(t=>(
-                  <TaskCard key={t.id} task={t} onToggle={onToggle} onEdit={()=>setEdit(t)}/>
+                  <TaskCard key={t.id} task={t} onToggle={onToggle} onEdit={()=>setEdit(t)} onShopToggle={onShopToggle}/>
                 ))}
               </div>
             )}
@@ -1066,20 +1267,64 @@ function ProfileScreen({ xp, tasks, events }) {
   const level=lvlOf(xp), rank=RANKS[Math.min(level-1,RANKS.length-1)];
   const rankIcon=RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)];
   const toNext=nextXP(xp), completed=tasks.filter(t=>t.done).length, total=tasks.length;
-
-  const ACHIEVEMENTS = [
-    {icon:"⚡",label:"Первый шаг",    desc:"Выполни 1 задачу",         done:completed>=1},
-    {icon:"🔥",label:"На волне",      desc:"Выполни 5 задач",           done:completed>=5},
-    {icon:"💎",label:"Целеустремлён", desc:"Создай 10 задач",           done:total>=10},
-    {icon:"👑",label:"Годовой план",  desc:"Добавь годовую цель",       done:tasks.some(t=>t.period==="year")},
-    {icon:"🎂",label:"Не забуду",     desc:"Добавь день рождения",      done:events.some(e=>e.isBirthday)},
-    {icon:"🔄",label:"Привычка",      desc:"Создай повторяемую задачу", done:tasks.some(t=>t.recurring)},
-    {icon:"🔥",label:"Серийщик",      desc:"Серия 7 дней подряд",       done:tasks.some(t=>t.streak>=7)},
-    {icon:"💪",label:"Легенда серии", desc:"Серия 30 дней подряд",      done:tasks.some(t=>t.streak>=30)},
-  ];
+  const [showLevelTable, setShowLevelTable] = useState(false);
 
   // Best streak across all tasks
   const bestStreak = Math.max(0, ...tasks.filter(t=>t.streakEnabled).map(t=>t.streak||0));
+  const hasShopTask = tasks.some(t=>t.shopItems && t.shopItems.length>0);
+  const shopItemsDone = tasks.reduce((acc,t)=>acc+(t.shopItems?t.shopItems.filter(i=>i.done).length:0),0);
+  const allPeriodsCovered = ["day","week","month","year"].every(p=>tasks.some(t=>t.period===p));
+
+  const ACHIEVEMENTS = [
+    // ── Прогресс задач
+    {icon:"⚡",label:"Первый шаг",       desc:"Выполни 1 задачу",          done:completed>=1,  cat:"tasks"},
+    {icon:"🔥",label:"На волне",         desc:"Выполни 5 задач",            done:completed>=5,  cat:"tasks"},
+    {icon:"💪",label:"В ритме",          desc:"Выполни 25 задач",           done:completed>=25, cat:"tasks"},
+    {icon:"🏆",label:"Сотня",            desc:"Выполни 100 задач",          done:completed>=100,cat:"tasks"},
+    {icon:"🌟",label:"Мастер квестов",   desc:"Выполни 500 задач",          done:completed>=500,cat:"tasks"},
+    {icon:"💎",label:"Целеустремлён",    desc:"Создай 10 задач",            done:total>=10,     cat:"tasks"},
+    {icon:"📦",label:"Архив квестов",    desc:"Создай 50 задач",            done:total>=50,     cat:"tasks"},
+    // ── Периоды
+    {icon:"👑",label:"Годовой план",     desc:"Добавь годовую цель",        done:tasks.some(t=>t.period==="year"),  cat:"period"},
+    {icon:"🌊",label:"Неделя",          desc:"Добавь еженедельную цель",   done:tasks.some(t=>t.period==="week"),  cat:"period"},
+    {icon:"💫",label:"Месяц",           desc:"Добавь ежемесячную цель",    done:tasks.some(t=>t.period==="month"), cat:"period"},
+    {icon:"🗓️",label:"Всё охвачено",   desc:"Добавь цели на все периоды", done:allPeriodsCovered,                 cat:"period"},
+    // ── Стрики
+    {icon:"🔥",label:"Серийщик",        desc:"Серия 7 дней подряд",        done:bestStreak>=7,   cat:"streak"},
+    {icon:"💪",label:"Стойкий",         desc:"Серия 30 дней подряд",       done:bestStreak>=30,  cat:"streak"},
+    {icon:"🔮",label:"Легенда серии",   desc:"Серия 100 дней подряд",      done:bestStreak>=100, cat:"streak"},
+    {icon:"♾️",label:"Вечный огонь",   desc:"Серия 365 дней подряд",      done:bestStreak>=365, cat:"streak"},
+    // ── Уровни
+    {icon:"⭐",label:"Посвящённый",     desc:"Достигни 5 уровня",          done:level>=5,  cat:"level"},
+    {icon:"🌟",label:"Искушённый",      desc:"Достигни 10 уровня",         done:level>=10, cat:"level"},
+    {icon:"💫",label:"Избранный",       desc:"Достигни 20 уровня",         done:level>=20, cat:"level"},
+    {icon:"🔮",label:"Архимаг",         desc:"Достигни 40 уровня",         done:level>=40, cat:"level"},
+    {icon:"👑",label:"Легенда",         desc:"Достигни 60 уровня",         done:level>=60, cat:"level"},
+    {icon:"⚡",label:"Запредельный",    desc:"Достигни 80 уровня",         done:level>=80, cat:"level"},
+    // ── Привычки и разное
+    {icon:"🔄",label:"Привычка",        desc:"Создай повторяемую задачу",  done:tasks.some(t=>t.recurring), cat:"habit"},
+    {icon:"📋",label:"Оптовик",         desc:"Используй режим «Список»",   done:tasks.filter(t=>!t.recurring).length>=5&&total>=5, cat:"habit"},
+    {icon:"🛒",label:"Шопоголик",       desc:"Создай список покупок",      done:hasShopTask,     cat:"habit"},
+    {icon:"🧺",label:"Закупился",       desc:"Отметь 10 покупок",          done:shopItemsDone>=10,cat:"habit"},
+    // ── Календарь и события
+    {icon:"🎂",label:"Не забуду",       desc:"Добавь день рождения",       done:events.some(e=>e.isBirthday),  cat:"events"},
+    {icon:"📅",label:"Организатор",     desc:"Добавь 5 событий",           done:events.length>=5,               cat:"events"},
+    {icon:"🗺️",label:"Путешественник", desc:"Добавь событие «Поездка»",   done:events.some(e=>e.eventType==="trip"), cat:"events"},
+    {icon:"⏰",label:"Дедлайнер",       desc:"Добавь событие «Дедлайн»",   done:events.some(e=>e.eventType==="deadline"), cat:"events"},
+    {icon:"🎉",label:"Праздник!",       desc:"Добавь событие «Праздник»",  done:events.some(e=>e.eventType==="holiday"), cat:"events"},
+    {icon:"📅",label:"Хронист",         desc:"Добавь 20 событий",          done:events.length>=20, cat:"events"},
+  ];
+
+  const doneCount = ACHIEVEMENTS.filter(a=>a.done).length;
+
+  // Level progression table data — show 5 rows around current level + some milestones
+  const MILESTONE_LEVELS = [1,2,3,5,10,15,20,30,40,50,60,70,80];
+  const tableRows = [...new Set([
+    ...MILESTONE_LEVELS,
+    level, level+1, level+2,
+  ])].filter(l=>l>=1&&l<=80).sort((a,b)=>a-b);
+
+  const fmtXP = n => n>=1000000?(n/1000000).toFixed(1)+"M":n>=1000?(n/1000).toFixed(0)+"K":n;
 
   return (
     <div style={{flex:1,overflowY:"auto",padding:"14px 16px",WebkitOverflowScrolling:"touch"}}>
@@ -1091,7 +1336,7 @@ function ProfileScreen({ xp, tasks, events }) {
         <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:18}}>
           <div style={{width:64,height:64,borderRadius:18,background:`linear-gradient(135deg,${T.purpDim},${T.bg3})`,border:`2px solid ${T.purp}66`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:`0 0 20px ${T.purp}44`}}>{rankIcon}</div>
           <div style={{flex:1}}>
-            <div style={{fontSize:11,color:T.sub,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700}}>Уровень {level}</div>
+            <div style={{fontSize:11,color:T.sub,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700}}>Уровень {level} / 80</div>
             <div style={{fontSize:22,fontWeight:900,color:T.text,lineHeight:1.1}}>
               {tg?.initDataUnsafe?.user?.first_name || "Герой"}
             </div>
@@ -1105,8 +1350,8 @@ function ProfileScreen({ xp, tasks, events }) {
 
         <div>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-            <span style={{fontSize:12,color:T.sub}}>До уровня {level+1}</span>
-            <span style={{fontSize:12,color:T.gold,fontWeight:700}}>{toNext>0?`ещё ${toNext} XP`:"Максимум!"}</span>
+            <span style={{fontSize:12,color:T.sub}}>До уровня {level<80?level+1:"MAX"}</span>
+            <span style={{fontSize:12,color:T.gold,fontWeight:700}}>{toNext>0?`ещё ${toNext.toLocaleString()} XP`:"Максимум! 👑"}</span>
           </div>
           <XPBar progress={progOf(xp)} color={T.purp} height={10}/>
         </div>
@@ -1115,10 +1360,10 @@ function ProfileScreen({ xp, tasks, events }) {
       {/* Stats */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
         {[
-          {label:"Выполнено",     value:completed,                                   icon:"✅",color:T.teal},
-          {label:"Всего квестов", value:total,                                       icon:"📜",color:T.sky},
-          {label:"Событий",       value:events.length,                               icon:"📅",color:T.purpL},
-          {label:"Лучшая серия",  value:bestStreak>0?`${bestStreak} 🔥`:"—",         icon:"🏆",color:"#FF6B35"},
+          {label:"Выполнено",     value:completed,                          icon:"✅",color:T.teal},
+          {label:"Всего квестов", value:total,                              icon:"📜",color:T.sky},
+          {label:"Событий",       value:events.length,                      icon:"📅",color:T.purpL},
+          {label:"Лучшая серия",  value:bestStreak>0?`${bestStreak} 🔥`:"—",icon:"🏆",color:"#FF6B35"},
         ].map(s=>(
           <div key={s.label} style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:13,padding:"14px 16px"}}>
             <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
@@ -1148,21 +1393,80 @@ function ProfileScreen({ xp, tasks, events }) {
 
       {/* Achievements */}
       <div style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:14,padding:"16px",marginBottom:16}}>
-        <div style={{fontSize:13,fontWeight:700,color:T.text,marginBottom:12}}>🏆 Достижения</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.text}}>🏆 Достижения</div>
+          <div style={{fontSize:12,color:T.gold,fontWeight:700}}>{doneCount}/{ACHIEVEMENTS.length}</div>
+        </div>
+        <XPBar progress={doneCount/ACHIEVEMENTS.length} color={T.gold} height={4}/>
+        <div style={{marginTop:14,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           {ACHIEVEMENTS.map(a=>(
             <div key={a.label} style={{
-              background:a.done?T.gold+"22":T.bg2,
+              background:a.done?T.gold+"22":T.bg0,
               border:`1px solid ${a.done?T.gold+"66":T.brd}`,
               borderRadius:11,padding:"12px",transition:"all 0.3s",
             }}>
-              <div style={{fontSize:22,marginBottom:4,filter:a.done?"none":"grayscale(0.5) opacity(0.6)"}}>{a.icon}</div>
-              <div style={{fontSize:12,fontWeight:700,color:a.done?T.gold:T.text}}>{a.label}</div>
-              <div style={{fontSize:10,color:a.done?T.goldDim:T.sub,marginTop:3,lineHeight:1.4}}>{a.desc}</div>
+              <div style={{fontSize:22,marginBottom:4,filter:a.done?"none":"grayscale(0.8) opacity(0.4)"}}>{a.icon}</div>
+              <div style={{fontSize:12,fontWeight:700,color:a.done?T.gold:T.sub}}>{a.label}</div>
+              <div style={{fontSize:10,color:a.done?T.goldDim:T.dim,marginTop:3,lineHeight:1.4}}>{a.desc}</div>
               {!a.done && <div style={{fontSize:9,color:T.dim,marginTop:4,fontWeight:600,letterSpacing:"0.04em"}}>🔒 не открыто</div>}
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Level Progression Table */}
+      <div style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:14,padding:"16px",marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,cursor:"pointer"}}
+          onClick={()=>setShowLevelTable(v=>!v)}>
+          <div style={{fontSize:13,fontWeight:700,color:T.text}}>📈 Таблица уровней (80)</div>
+          <div style={{
+            fontSize:11,color:T.purpL,fontWeight:700,
+            background:T.purp+"22",border:`1px solid ${T.purp}44`,
+            padding:"3px 10px",borderRadius:20,
+          }}>{showLevelTable?"▲ Свернуть":"▼ Показать"}</div>
+        </div>
+
+        {showLevelTable && (
+          <>
+            <div style={{fontSize:11,color:T.sub,marginBottom:10,lineHeight:1.5}}>
+              Ранние уровни достигаются быстро. С каждым уровнем требования растут — уровень 80 потребует миллионы XP.
+            </div>
+            <div style={{
+              display:"grid",
+              gridTemplateColumns:"36px 1fr 80px 60px",
+              gap:"0 8px",
+              fontSize:11,
+            }}>
+              {/* Header */}
+              {["Ур.","Ранг","Нужно XP","Всего"].map(h=>(
+                <div key={h} style={{color:T.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",padding:"4px 0",borderBottom:`1px solid ${T.brd}`,marginBottom:4}}>{h}</div>
+              ))}
+              {tableRows.map(l => {
+                const isCurrent = l === level;
+                const isReached = xp >= (XP_TABLE[l-1]??0);
+                const needed = l===1?0:(XP_TABLE[l-1]??0)-(XP_TABLE[l-2]??0);
+                const total_ = XP_TABLE[l-1]??0;
+                return [
+                  <div key={`l${l}`} style={{color:isCurrent?T.gold:isReached?T.teal:T.sub,fontWeight:isCurrent?900:600,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,display:"flex",alignItems:"center",gap:3}}>
+                    {isCurrent?"▶":""}{l}
+                  </div>,
+                  <div key={`r${l}`} style={{color:isCurrent?T.gold:isReached?T.text:T.dim,fontWeight:isCurrent?800:400,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                    {RANK_ICONS[Math.min(l-1,79)]} {RANKS[Math.min(l-1,79)]}
+                  </div>,
+                  <div key={`n${l}`} style={{color:isCurrent?T.purpL:isReached?T.sub:T.dim,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,textAlign:"right"}}>
+                    {l===1?"—":"+"+fmtXP(needed)}
+                  </div>,
+                  <div key={`t${l}`} style={{color:isCurrent?T.gold:isReached?T.teal:T.dim,fontWeight:isCurrent?800:400,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,textAlign:"right"}}>
+                    {l===1?"0":fmtXP(total_)}
+                  </div>,
+                ];
+              })}
+            </div>
+            <div style={{marginTop:12,fontSize:11,color:T.dim,textAlign:"center"}}>
+              Уровень 80 требует {(XP_TABLE[79]/1000000).toFixed(1)}M XP — ~{Math.round(XP_TABLE[79]/15).toLocaleString()} ежедневных задач
+            </div>
+          </>
+        )}
       </div>
       <div style={{height:20}}/>
     </div>
@@ -1752,6 +2056,12 @@ export default function App() {
   },[]);
 
   const handleDelete   = useCallback(id => setTasks(p=>p.filter(t=>t.id!==id)),[]);
+  const handleShopToggle = useCallback((taskId, itemId) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId || !t.shopItems) return t;
+      return {...t, shopItems: t.shopItems.map(it => it.id===itemId ? {...it, done:!it.done} : it)};
+    }));
+  }, []);
   const handleAddEvent = useCallback((ev, autoTasks)=>{
     if(ev) setEvts(p=>[ev,...p]);
     if(autoTasks?.length) setTasks(p=>[...autoTasks,...p]);
@@ -1833,7 +2143,7 @@ export default function App() {
 
       {/* Screen */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
-        {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete}/>}
+        {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete} onShopToggle={handleShopToggle}/>}
         {tab==="calendar" && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent}/>}
         {tab==="social"   && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg}/>}
         {tab==="profile"  && <ProfileScreen  xp={xp}        tasks={tasks}           events={events}/>}
