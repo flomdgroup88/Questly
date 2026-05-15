@@ -75,12 +75,40 @@ export async function cloudUpdateMyProgress(shareCode, name, streak, history) {
 export async function cloudAddParticipant(type, shareCode, participant) {
   try {
     const col = type === "challenge" ? "challenges" : "sharedGoals";
-    await updateDoc(doc(db, col, shareCode), {
-      participants: arrayUnion(participant),
-    });
+    if (type === "challenge") {
+      // Для соревнований: проверяем по имени, чтобы не добавить дубль
+      const snap = await getDoc(doc(db, col, shareCode));
+      if (!snap.exists()) return false;
+      const parts = snap.data().participants || [];
+      if (parts.some(p => p.name === participant.name)) return true; // уже есть
+      await updateDoc(doc(db, col, shareCode), { participants: [...parts, participant] });
+    } else {
+      await updateDoc(doc(db, col, shareCode), { participants: arrayUnion(participant) });
+    }
     return true;
   } catch (e) {
     console.warn("Firebase addParticipant error:", e);
     return false;
+  }
+}
+
+// ─── Удалить дублирующихся участников (по имени, оставить с лучшим streak) ───
+export async function cloudDeduplicateParticipants(shareCode) {
+  try {
+    const snap = await getDoc(doc(db, "challenges", shareCode));
+    if (!snap.exists()) return;
+    const parts = snap.data().participants || [];
+    const seen = {};
+    for (const p of parts) {
+      if (!seen[p.name] || (p.streak || 0) > (seen[p.name].streak || 0)) {
+        seen[p.name] = p;
+      }
+    }
+    const deduped = Object.values(seen);
+    if (deduped.length < parts.length) {
+      await updateDoc(doc(db, "challenges", shareCode), { participants: deduped });
+    }
+  } catch (e) {
+    console.warn("Firebase dedup error:", e);
   }
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { cloudSave, cloudFind, cloudAddParticipant, cloudGetParticipants, cloudUpdateMyProgress } from "./firebase.js";
+import { cloudSave, cloudFind, cloudAddParticipant, cloudGetParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants } from "./firebase.js";
 
 // ─── TELEGRAM WEBAPP INIT ─────────────────────────────────────────
 const tg = typeof window !== "undefined" && window.Telegram?.WebApp;
@@ -1333,19 +1333,23 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
   const [freshParts, setFreshParts] = useState(ch.participants||[]);
   const [syncing, setSyncing] = useState(false);
 
-  const refresh = () => {
+  const refresh = (dedup=false) => {
     if(!ch.shareCode) return;
     setSyncing(true);
-    cloudGetParticipants(ch.shareCode).then(parts=>{
+    // Первый раз — чистим дубли (на случай если они уже есть в Firebase)
+    const fetchParts = dedup
+      ? cloudDeduplicateParticipants(ch.shareCode).then(()=>cloudGetParticipants(ch.shareCode))
+      : cloudGetParticipants(ch.shareCode);
+    fetchParts.then(parts=>{
       setFreshParts(parts.filter(p=>p.name!==myName));
       setSyncing(false);
     }).catch(()=>setSyncing(false));
   };
 
   useEffect(()=>{
-    refresh();
+    refresh(true); // первый раз — с дедупликацией
     // Автообновление каждые 15 секунд пока открыто
-    const timer = setInterval(refresh, 15000);
+    const timer = setInterval(()=>refresh(false), 15000);
     return ()=>clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[ch.shareCode, myName]);
@@ -1489,6 +1493,19 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
   const [detailCh,setDetailCh]=useState(null);
   const [detailSg,setDetailSg]=useState(null);
   const [shareItem,setShare]=useState(null); // {code,title}
+
+  // При загрузке экрана — подтягиваем свежих участников из Firebase для всех соревнований
+  useEffect(()=>{
+    const myName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Ты";
+    challenges.forEach(ch=>{
+      if(!ch.shareCode) return;
+      cloudGetParticipants(ch.shareCode).then(parts=>{
+        const others = parts.filter(p=>p.name!==myName);
+        onUpdateCh(ch.id, c=>({...c, participants:others}));
+      }).catch(()=>{});
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
 
   const completeCh = id => {
     onUpdateCh(id, ch => {
