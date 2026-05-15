@@ -2149,7 +2149,8 @@ export default function App() {
   const [tasks,  setTasks] = useState(saved?.tasks   ?? INIT_TASKS);
   const [events, setEvts]  = useState(saved?.events  ?? INIT_EVENTS);
   const [nickname, setNickname] = useState(saved?.nickname ?? "");
-  const [tab,    setTab]   = useState("tasks");
+  const [tab,    setTab]   = useState("overview");
+  const [overviewEditTask, setOverviewEditTask] = useState(null);
   const [xpAnim,  setXPAnim]  = useState(null);
   const [lvlUpAnim,setLvlUp] = useState(false);
   const prevLvlRef = useRef(lvlOf(saved?.xp??340));
@@ -2251,8 +2252,8 @@ export default function App() {
   },[]);
 
   const TABS = [
-    {id:"tasks",    label:"Квесты",    icon:"⚔️"},
     {id:"overview", label:"Главная",   icon:"🏠"},
+    {id:"tasks",    label:"Квесты",    icon:"⚔️"},
     {id:"calendar", label:"Календарь", icon:"📅"},
     {id:"social",   label:"Союзники",  icon:"🤝"},
     {id:"profile",  label:"Герой",     icon:"🧙"},
@@ -2326,7 +2327,7 @@ export default function App() {
       {/* Screen */}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
         {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete} onShopToggle={handleShopToggle}/>}
-        {tab==="overview" && <OverviewScreen tasks={tasks}/>}
+        {tab==="overview" && <OverviewScreen tasks={tasks} xp={xp} level={level} rank={RANKS[Math.min(level-1,RANKS.length-1)]} rankIcon={RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)]} xpProgress={progOf(xp)} onEditTask={setOverviewEditTask}/>}
         {tab==="calendar" && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent}/>}
         {tab==="social"   && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg}/>}
         {tab==="profile"  && <ProfileScreen  xp={xp} tasks={tasks} events={events} nickname={nickname} onSetNickname={setNickname}/>}
@@ -2342,6 +2343,16 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* Edit modal triggered from Overview screen */}
+      {overviewEditTask && (
+        <TaskModal
+          existing={overviewEditTask}
+          onClose={()=>setOverviewEditTask(null)}
+          onSave={t=>{handleSave(t);setOverviewEditTask(null);}}
+          onDelete={id=>{handleDelete(id);setOverviewEditTask(null);}}
+        />
+      )}
     </div>
   );
 }
