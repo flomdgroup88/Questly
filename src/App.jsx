@@ -1326,18 +1326,30 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
 
 // ─── CHALLENGE DETAIL MODAL ───────────────────────────────────────
 function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
-  const myName = ch._myName || "Ты";
+  // Всегда берём имя из Telegram — не из Firebase, чтобы у каждого было своё имя
+  const myName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||ch._myName||"Ты";
   const myDoneToday = ch.myHistory.includes(today);
   const period = ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно";
   const [freshParts, setFreshParts] = useState(ch.participants||[]);
+  const [syncing, setSyncing] = useState(false);
+
+  const refresh = () => {
+    if(!ch.shareCode) return;
+    setSyncing(true);
+    cloudGetParticipants(ch.shareCode).then(parts=>{
+      setFreshParts(parts.filter(p=>p.name!==myName));
+      setSyncing(false);
+    }).catch(()=>setSyncing(false));
+  };
+
   useEffect(()=>{
-    if(ch.shareCode){
-      cloudGetParticipants(ch.shareCode).then(parts=>{
-        // Фильтруем себя из участников, чтобы не дублировать
-        setFreshParts(parts.filter(p=>p.name!==myName));
-      });
-    }
+    refresh();
+    // Автообновление каждые 15 секунд пока открыто
+    const timer = setInterval(refresh, 15000);
+    return ()=>clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[ch.shareCode, myName]);
+
   const allParts = [
     { name:myName, avatar:"🧙", streak:ch.myStreak, history:ch.myHistory, isMe:true },
     ...freshParts.map(p=>({...p, isMe:false})),
@@ -1347,6 +1359,16 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
 
   return (
     <ModalOverlay onClose={onClose}>
+      {/* Кнопка назад — всегда видна */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        <button onClick={onClose} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",borderRadius:10,background:T.bg0,border:`1px solid ${T.brd}`,color:T.sub,fontSize:13,fontWeight:600,cursor:"pointer"}}>
+          ← Назад
+        </button>
+        <button onClick={refresh} style={{padding:"8px 12px",borderRadius:10,background:T.bg0,border:`1px solid ${T.brd}`,color:syncing?T.dim:T.teal,fontSize:13,fontWeight:600,cursor:"pointer"}}>
+          {syncing?"⏳":"🔄 Обновить"}
+        </button>
+      </div>
+
       <div style={{textAlign:"center",marginBottom:16}}>
         <div style={{fontSize:44,marginBottom:4}}>{ch.emoji}</div>
         <h3 style={{margin:0,fontSize:19,fontWeight:900,color:T.text}}>{ch.title}</h3>
@@ -1379,7 +1401,7 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
           {last21.map(d=>{
             const myD=ch.myHistory.includes(d);
-            const friendDs=ch.participants.filter(p=>p.history.includes(d));
+            const friendDs=freshParts.filter(p=>p.history&&p.history.includes(d));
             return (
               <div key={d} style={{aspectRatio:"1",borderRadius:6,position:"relative",overflow:"hidden",background:T.bg0,border:`1px solid ${T.brd}`}}>
                 {myD && <div style={{position:"absolute",bottom:0,left:0,right:0,height:"50%",background:T.purp+"88"}}/>}
@@ -1389,9 +1411,9 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
             );
           })}
         </div>
-        <div style={{display:"flex",gap:16,marginTop:8,justifyContent:"center"}}>
-          <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:T.sub}}><div style={{width:12,height:12,borderRadius:3,background:T.purp+"88"}}/> Ты</div>
-          {ch.participants.map(p=><div key={p.name} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:T.sub}}><div style={{width:12,height:12,borderRadius:3,background:T.teal+"88"}}/>{p.name}</div>)}
+        <div style={{display:"flex",gap:16,marginTop:8,justifyContent:"center",flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:T.sub}}><div style={{width:12,height:12,borderRadius:3,background:T.purp+"88"}}/>{myName} (ты)</div>
+          {freshParts.map(p=><div key={p.name} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:T.sub}}><div style={{width:12,height:12,borderRadius:3,background:T.teal+"88"}}/>{p.name}</div>)}
         </div>
       </div>
 
@@ -1492,10 +1514,11 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
   };
 
   const joinCh = chData => {
-    // Если соревнование пришло из облака — добавляем его целиком, иначе помечаем joined
+    // Джойнер должен хранить СВОЁ имя, а не имя создателя из Firebase
+    const myName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Друг";
     const exists = challenges ? challenges.find(c=>c.id===chData.id||c.shareCode===chData.shareCode) : false;
-    if(exists) onUpdateCh(chData.id, ch=>({...ch, joined:true}));
-    else onCreateCh({...chData, myStreak:0, myHistory:[], joined:true});
+    if(exists) onUpdateCh(chData.id, ch=>({...ch, joined:true, _myName:myName}));
+    else onCreateCh({...chData, myStreak:0, myHistory:[], joined:true, _myName:myName});
   };
   const joinSg = sgData => {
     const userName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Ты";
