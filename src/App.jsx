@@ -2252,7 +2252,7 @@ export default function App() {
 
   const TABS = [
     {id:"tasks",    label:"Квесты",    icon:"⚔️"},
-    {id:"overview", label:"Обзор",     icon:"👁️"},
+    {id:"overview", label:"Главная",   icon:"🏠"},
     {id:"calendar", label:"Календарь", icon:"📅"},
     {id:"social",   label:"Союзники",  icon:"🤝"},
     {id:"profile",  label:"Герой",     icon:"🧙"},
@@ -2299,7 +2299,7 @@ export default function App() {
       )}
 
       {/* Header — hidden on calendar tab */}
-      {tab!=="calendar" && (
+      {tab!=="calendar" && tab!=="overview" && (
       <div style={{
         padding:`calc(14px + env(safe-area-inset-top,0px)) 16px 12px`,
         background:T.bg1,borderBottom:`1px solid ${T.brd}`,flexShrink:0,
