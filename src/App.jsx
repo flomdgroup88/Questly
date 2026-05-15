@@ -24,7 +24,7 @@ const T = {
 
 // ─── GAME CONFIG ──────────────────────────────────────────────────
 const PERIODS = [
-  { id:"day",   label:"День",   xp:15,  accent:T.teal,  icon:"⚡", desc:"на сегодня" },
+  { id:"day",   label:"Сегодня", xp:15,  accent:T.teal,  icon:"⚡", desc:"на сегодня" },
   { id:"week",  label:"Неделя", xp:50,  accent:T.sky,   icon:"🌊", desc:"на неделю"  },
   { id:"month", label:"Месяц",  xp:150, accent:T.purpL, icon:"💫", desc:"на месяц"   },
   { id:"year",  label:"Год",    xp:600, accent:T.gold,  icon:"👑", desc:"на год"     },
@@ -89,7 +89,8 @@ const lvlOf  = xp => Math.min(RANKS.length, [...XP_TABLE].reverse().findIndex(v 
 const progOf = xp => { const l = lvlOf(xp); if (l >= RANKS.length) return 1; const a = XP_TABLE[l-1]??0, b = XP_TABLE[l]??a+1; return Math.min((xp-a)/(b-a),1); };
 const nextXP = xp => { const l = lvlOf(xp); return l >= RANKS.length ? 0 : (XP_TABLE[l]??0) - xp; };
 
-const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const todayStr    = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const tomorrowStr = () => { const d = new Date(); d.setDate(d.getDate()+1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const fmtDate  = s => { const [y,m,d] = s.split("-"); return `${d}.${m}.${y}`; };
 const uid      = () => `q${Date.now().toString(36)}${Math.random().toString(36).slice(2,5)}`;
 
@@ -469,11 +470,11 @@ function RecurPicker({ value, onChange, accentC=T.purp, accentL=T.purpL }) {
 }
 
 // ─── TASK MODAL (create + edit) ───────────────────────────────────
-function TaskModal({ onClose, onSave, onDelete, existing=null }) {
+function TaskModal({ onClose, onSave, onDelete, existing=null, initialDate=null }) {
   const isEdit = !!existing;
   const [title,    setTitle]  = useState(existing?.title    ?? "");
   const [period,   setPeriod] = useState(existing?.period   ?? "day");
-  const [dueDate,  setDate]   = useState(existing?.dueDate  ?? defaultDueForPeriod(existing?.period ?? "day"));
+  const [dueDate,  setDate]   = useState(existing?.dueDate  ?? initialDate ?? defaultDueForPeriod(existing?.period ?? "day"));
   const [recurring,setRec]    = useState(existing?.recurring ?? false);
   const [recurType,setRT]     = useState(existing?.recurType ?? "day");
   const [streakEnabled, setStreak] = useState(existing?.streakEnabled ?? false);
@@ -1104,7 +1105,18 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopToggle }) {
   const [showCreate,setCreate] = useState(false);
   const [editTask,setEdit]   = useState(null);
 
+  const FILTER_TABS = [
+    { id:"day",      label:"Сегодня", icon:"⚡", accent:T.teal  },
+    { id:"tomorrow", label:"Завтра",  icon:"🌅", accent:T.sky   },
+    { id:"week",     label:"Неделя",  icon:"🌊", accent:T.sky   },
+    { id:"month",    label:"Месяц",   icon:"💫", accent:T.purpL },
+    { id:"year",     label:"Год",     icon:"👑", accent:T.gold  },
+  ];
+
+  const tmrw = tomorrowStr();
+
   const filtered  = tasks.filter(t => {
+    if (filter === "tomorrow") return t.period === "day" && t.dueDate === tmrw;
     if (t.period !== filter) return false;
     if (!t.dueDate) return filter === "day";
     if (filter === "day")   return t.dueDate === today;
@@ -1116,7 +1128,10 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopToggle }) {
   const done      = filtered.filter(t=>t.done).length;
   const total     = filtered.length;
   const pct       = total>0?done/total:0;
-  const p         = PERIODS.find(x=>x.id===filter);
+  const ft        = FILTER_TABS.find(x=>x.id===filter);
+  const p         = filter === "tomorrow"
+    ? { accent:T.sky, desc:"на завтра", xp:15 }
+    : PERIODS.find(x=>x.id===filter);
 
   return (
     // ✅ FIX: position:relative so the FAB absolute-positions correctly
@@ -1124,24 +1139,24 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopToggle }) {
 
       {/* Period filter tabs — segmented control */}
       <div style={{padding:"12px 16px 8px",flexShrink:0}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,background:T.bg2,borderRadius:14,padding:4,border:`1px solid ${T.brd}`}}>
-          {PERIODS.map(pd=>{
-            const active = filter===pd.id;
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:3,background:T.bg2,borderRadius:14,padding:3,border:`1px solid ${T.brd}`}}>
+          {FILTER_TABS.map(ft=>{
+            const active = filter===ft.id;
             return (
-              <div key={pd.id} onClick={()=>setFilter(pd.id)} style={{
+              <div key={ft.id} onClick={()=>setFilter(ft.id)} style={{
                 borderRadius:10,cursor:"pointer",
-                padding:"8px 4px",
+                padding:"7px 2px",
                 display:"flex",flexDirection:"column",alignItems:"center",gap:2,
-                background:active?pd.accent:"transparent",
-                boxShadow:active?`0 2px 8px ${pd.accent}55`:"none",
+                background:active?ft.accent:"transparent",
+                boxShadow:active?`0 2px 8px ${ft.accent}55`:"none",
                 transition:"all 0.2s cubic-bezier(.34,1.56,.64,1)",
               }}>
-                <span style={{fontSize:15,lineHeight:1}}>{pd.icon}</span>
+                <span style={{fontSize:13,lineHeight:1}}>{ft.icon}</span>
                 <span style={{
-                  fontSize:11,fontWeight:700,letterSpacing:"0.01em",
-                  color:active?(pd.id==="month"?"#fff":"#000"):T.sub,
+                  fontSize:10,fontWeight:700,letterSpacing:"0.01em",
+                  color:active?(ft.id==="month"?"#fff":"#000"):T.sub,
                   transition:"color 0.2s",
-                }}>{pd.label}</span>
+                }}>{ft.label}</span>
               </div>
             );
           })}
@@ -1200,7 +1215,7 @@ function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopToggle }) {
         }}>+</div>
       </div>
 
-      {showCreate && <TaskModal onClose={()=>setCreate(false)} onSave={t=>{onSave(t);setCreate(false);}}/>}
+      {showCreate && <TaskModal onClose={()=>setCreate(false)} onSave={t=>{onSave(t);setCreate(false);}} initialDate={filter==="tomorrow"?tomorrowStr():null}/>}
       {editTask   && <TaskModal existing={editTask} onClose={()=>setEdit(null)} onSave={t=>{onSave(t);setEdit(null);}} onDelete={id=>{onDelete(id);setEdit(null);}}/>}
     </div>
   );

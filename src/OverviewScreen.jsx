@@ -11,10 +11,16 @@ const T = {
 };
 
 const TABS = [
-  { key:"day",   label:"Сегодня" },
-  { key:"week",  label:"Неделя"  },
-  { key:"month", label:"Месяц"   },
+  { key:"day",      label:"Сегодня" },
+  { key:"tomorrow", label:"Завтра"  },
+  { key:"week",     label:"Неделя"  },
+  { key:"month",    label:"Месяц"   },
 ];
+
+const tomorrowStr = () => {
+  const d = new Date(); d.setDate(d.getDate()+1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
 
 const MONTHS_GEN = [
   "января","февраля","марта","апреля","мая","июня",
@@ -134,25 +140,6 @@ function TaskRow({ task, num, accent, activeTab, isDragging, isDropTarget, onDra
             {due.label}
           </div>
         )}
-      </div>
-
-      {/* Edit / settings button */}
-      <div
-        onClick={(e) => { e.stopPropagation(); onEdit(); }}
-        style={{
-          width:32, height:32,
-          borderRadius:9,
-          background:T.bg3,
-          border:`1px solid ${T.brd}`,
-          display:"flex", alignItems:"center", justifyContent:"center",
-          cursor:"pointer", fontSize:13, color:T.sub,
-          flexShrink:0,
-          transition:"background 0.15s, color 0.15s, border-color 0.15s",
-        }}
-        onMouseEnter={e=>{e.currentTarget.style.background=T.purp+"33";e.currentTarget.style.color=T.purpL;e.currentTarget.style.borderColor=T.purp+"55";}}
-        onMouseLeave={e=>{e.currentTarget.style.background=T.bg3;e.currentTarget.style.color=T.sub;e.currentTarget.style.borderColor=T.brd;}}
-      >
-        ⚙️
       </div>
     </div>
   );
@@ -288,18 +275,22 @@ export default function OverviewScreen({
     setOrderMap(prev => ({ ...prev, [key]: ids }));
   }, []);
 
+  const tomorrow = tomorrowStr();
+
   const tasksByTab = {
-    day:   tasks.filter(t => !t.done && t.period==="day"   && t.dueDate===today),
-    week:  tasks.filter(t => !t.done && t.period==="week"  && isInCurrentWeek(t.dueDate||today)),
-    month: tasks.filter(t => !t.done && t.period==="month" && isInCurrentMonth(t.dueDate||today)),
+    day:      tasks.filter(t => !t.done && t.period==="day"   && t.dueDate===today),
+    tomorrow: tasks.filter(t => !t.done && t.period==="day"   && t.dueDate===tomorrow),
+    week:     tasks.filter(t => !t.done && t.period==="week"  && isInCurrentWeek(t.dueDate||today)),
+    month:    tasks.filter(t => !t.done && t.period==="month" && isInCurrentMonth(t.dueDate||today)),
   };
 
-  const ACCENT  = { day:T.teal, week:T.sky, month:T.purpL };
+  const ACCENT  = { day:T.teal, tomorrow:T.sky, week:T.sky, month:T.purpL };
   const accent  = ACCENT[activeTab];
 
   const sectionLabel = (() => {
-    if (activeTab === "day")   return `ДЕЛА ${now.getDate()} ${MONTHS_GEN[now.getMonth()]}`;
-    if (activeTab === "week")  return "ДЕЛА НА НЕДЕЛЮ";
+    if (activeTab === "day")      return `ДЕЛА ${now.getDate()} ${MONTHS_GEN[now.getMonth()]}`;
+    if (activeTab === "tomorrow") { const t = new Date(); t.setDate(t.getDate()+1); return `ДЕЛА ${t.getDate()} ${MONTHS_GEN[t.getMonth()]}`; }
+    if (activeTab === "week")     return "ДЕЛА НА НЕДЕЛЮ";
     return "ДЕЛА НА МЕСЯЦ";
   })();
 
