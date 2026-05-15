@@ -1,8 +1,4 @@
 // ─── FIREBASE CONFIG ──────────────────────────────────────────────
-// Это бесплатный проект Firebase специально для Questly.
-// Firestore хранит соревнования и цели, чтобы друзья могли
-// находить их по коду с любого устройства.
-
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
 
@@ -16,16 +12,11 @@ const firebaseConfig = {
   measurementId: "G-944C4YQF3S"
 };
 
-// ⚠️ ВАЖНО: замени firebaseConfig выше на свой из Firebase Console
-// Инструкция: см. README_FIREBASE.md в папке проекта
-
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
 // ─── Сохранить соревнование/цель в облако ────────────────────────
 export async function cloudSave(type, item) {
-  // type: "challenges" | "sharedGoals"
-  // item.shareCode — уникальный ключ
   try {
     await setDoc(doc(db, type, item.shareCode), {
       ...item,
@@ -48,6 +39,36 @@ export async function cloudFind(code) {
   const sgSnap = await getDoc(doc(db, "sharedGoals", c));
   if (sgSnap.exists()) return { type: "goal", data: sgSnap.data() };
   return null;
+}
+
+// ─── Получить свежих участников из облака ────────────────────────
+export async function cloudGetParticipants(shareCode) {
+  try {
+    const snap = await getDoc(doc(db, "challenges", shareCode));
+    if (snap.exists()) return snap.data().participants || [];
+    return [];
+  } catch (e) {
+    console.warn("Firebase getParticipants error:", e);
+    return [];
+  }
+}
+
+// ─── Обновить свою запись участника (прогресс) ───────────────────
+export async function cloudUpdateMyProgress(shareCode, name, streak, history) {
+  try {
+    const snap = await getDoc(doc(db, "challenges", shareCode));
+    if (!snap.exists()) return false;
+    const parts = snap.data().participants || [];
+    const idx = parts.findIndex(p => p.name === name);
+    const entry = { name, avatar: "👤", streak, history, lastCompleted: history[history.length - 1] || null };
+    if (idx >= 0) parts[idx] = entry;
+    else parts.push(entry);
+    await updateDoc(doc(db, "challenges", shareCode), { participants: parts });
+    return true;
+  } catch (e) {
+    console.warn("Firebase updateMyProgress error:", e);
+    return false;
+  }
 }
 
 // ─── Добавить участника к существующему соревнованию ─────────────

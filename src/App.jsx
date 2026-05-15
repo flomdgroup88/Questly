@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { cloudSave, cloudFind, cloudAddParticipant } from "./firebase.js";
+import { cloudSave, cloudFind, cloudAddParticipant, cloudGetParticipants, cloudUpdateMyProgress } from "./firebase.js";
 
 // ─── TELEGRAM WEBAPP INIT ─────────────────────────────────────────
 const tg = typeof window !== "undefined" && window.Telegram?.WebApp;
@@ -1201,7 +1201,8 @@ function NewChallengeModal({ onClose, onCreate }) {
   const EMOJIS=["🏋️","🏃","🧘","📚","💧","🌅","🎯","💪","🚴","🍎","✏️","🎸"];
   const submit=()=>{
     if (!title.trim()) return;
-    onCreate({ id:uid(), title:title.trim(), emoji, desc:desc.trim(), shareCode:mkCode(), recurType:rt, createdAt:today, myStreak:0, myHistory:[], participants:[] });
+    const creatorName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Создатель";
+    onCreate({ id:uid(), title:title.trim(), emoji, desc:desc.trim(), shareCode:mkCode(), recurType:rt, createdAt:today, myStreak:0, myHistory:[], participants:[], _myName:creatorName });
     onClose();
   };
   return (
@@ -1325,11 +1326,21 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
 
 // ─── CHALLENGE DETAIL MODAL ───────────────────────────────────────
 function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
+  const myName = ch._myName || "Ты";
   const myDoneToday = ch.myHistory.includes(today);
   const period = ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно";
+  const [freshParts, setFreshParts] = useState(ch.participants||[]);
+  useEffect(()=>{
+    if(ch.shareCode){
+      cloudGetParticipants(ch.shareCode).then(parts=>{
+        // Фильтруем себя из участников, чтобы не дублировать
+        setFreshParts(parts.filter(p=>p.name!==myName));
+      });
+    }
+  },[ch.shareCode, myName]);
   const allParts = [
-    { name:"Ты", avatar:"🧙", streak:ch.myStreak, history:ch.myHistory, isMe:true },
-    ...ch.participants.map(p=>({...p, isMe:false})),
+    { name:myName, avatar:"🧙", streak:ch.myStreak, history:ch.myHistory, isMe:true },
+    ...freshParts.map(p=>({...p, isMe:false})),
   ].sort((a,b)=>b.streak-a.streak);
 
   const last21 = Array.from({length:21},(_,i)=>pastDay(20-i));
@@ -1473,6 +1484,9 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
           if(sorted.includes(prev)){streak++;cur=prev;}else break;
         }
       }
+      // Синхронизируем прогресс в Firebase — чтобы друг видел обновление
+      const myName = ch._myName || "Ты";
+      if(ch.shareCode) cloudUpdateMyProgress(ch.shareCode, myName, streak, newHistory);
       return {...ch, myHistory:newHistory, myStreak:streak};
     });
   };
@@ -1642,8 +1656,14 @@ export default function App() {
   const handleDeleteCh = useCallback(id => setChallenges(p=>p.filter(c=>c.id!==id)), []);
   const handleDeleteSg = useCallback(id => setSharedGoals(p=>p.filter(s=>s.id!==id)), []);
   const handleCreateCh = useCallback(ch => {
+    const myName = ch._myName || "Создатель";
+    // Сохраняем создателя как участника в Firebase (чтобы друг его видел)
+    const chWithCreator = {
+      ...ch,
+      participants: [{ name: myName, avatar: "🧙", streak: 0, history: [], lastCompleted: null }],
+    };
     setChallenges(p=>[ch,...p]);
-    cloudSave("challenges", ch).then(ok => {
+    cloudSave("challenges", chWithCreator).then(ok => {
       if (!ok) console.error("⚠️ Не удалось сохранить соревнование в облако. Проверь правила Firestore.");
     });
   }, []);
