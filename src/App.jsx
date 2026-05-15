@@ -321,7 +321,7 @@ const spawnRecurring = (tasks, events, day) => {
 // ─── SHARED COMPONENTS ────────────────────────────────────────────
 function Toggle({ value, onChange }) {
   return (
-    <div onClick={() => onChange(!value)} style={{
+    <div onClick={e => { e.stopPropagation(); onChange(!value); }} style={{
       width:44,height:24,borderRadius:12,cursor:"pointer",
       background:value?T.purp:T.dim,position:"relative",transition:"background 0.25s",flexShrink:0,
     }}>
