@@ -1265,16 +1265,13 @@ function NewSharedGoalModal({ onClose, onCreate }) {
 // ─── JOIN BY CODE MODAL ───────────────────────────────────────────
 function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
   const [code,setCode]=useState(""); const [result,setResult]=useState(null); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
-  const search=async()=>{
-    const c=code.trim().toUpperCase();
+  const search=async(c)=>{
     if(!c){setErr("Введи код");return;}
-    // Сначала ищем локально (вдруг это своё соревнование)
     const localCh=challenges.find(x=>x.shareCode===c);
     const localSg=sharedGoals.find(x=>x.shareCode===c);
     if(localCh){setResult({type:"challenge",data:localCh});setErr("");return;}
     if(localSg){setResult({type:"goal",data:localSg});setErr("");return;}
-    // Если не нашли локально — ищем в облаке (Firebase)
-    setLoading(true);setErr("");
+    setLoading(true);setErr("");setResult(null);
     try{
       const found=await cloudFind(c);
       if(found){setResult(found);setErr("");}
@@ -1282,9 +1279,13 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
     }catch{setErr("Ошибка соединения. Проверь интернет.");}
     finally{setLoading(false);}
   };
+  const handleChange=e=>{
+    const val=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"");
+    setCode(val);setResult(null);setErr("");
+    if(val.length===6) search(val);
+  };
   const join=async()=>{
     if(!result) return;
-    // Добавляем себя как участника в облако (чтобы друг тоже видел)
     const userName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Друг";
     if(result.type==="challenge"){
       onJoinCh(result.data);
@@ -1298,10 +1299,13 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
   return (
     <ModalOverlay onClose={onClose}>
       <h3 style={{margin:"0 0 4px",fontSize:18,fontWeight:800,color:T.sky}}>🔗 Присоединиться</h3>
-      <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Введи код от друга</p>
-      <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&search()} placeholder="ABCDEF" maxLength={6} style={{flex:1,padding:"12px 14px",background:T.bg0,border:`1px solid ${T.brd}`,borderRadius:11,color:T.text,fontSize:20,fontWeight:800,letterSpacing:"0.15em",textAlign:"center",outline:"none",colorScheme:"dark"}}/>
-        <Btn onClick={search} style={{width:80,flexShrink:0}} disabled={loading}>{loading?"⏳":"Найти"}</Btn>
+      <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Введи 6-значный код от друга</p>
+      <div style={{marginBottom:14}}>
+        <input value={code} onChange={handleChange} placeholder="ABCDEF" maxLength={6}
+          style={{width:"100%",boxSizing:"border-box",padding:"14px",background:T.bg0,border:`2px solid ${code.length===6?(result?T.teal:err?T.rose:T.brd):T.brd}`,borderRadius:11,color:T.text,fontSize:24,fontWeight:800,letterSpacing:"0.2em",textAlign:"center",outline:"none",colorScheme:"dark",transition:"border-color 0.2s"}}/>
+        <div style={{textAlign:"center",marginTop:8,fontSize:12,color:T.sub}}>
+          {loading?"⏳ Ищем...":code.length<6?`${code.length}/6 символов`:""}
+        </div>
       </div>
       {err && <div style={{color:T.rose,fontSize:13,marginBottom:12,textAlign:"center"}}>{err}</div>}
       {result && (
