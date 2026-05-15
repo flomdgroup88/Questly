@@ -1676,12 +1676,13 @@ function ShareSheet({ code, title, onClose }) {
 }
 
 // ─── NEW CHALLENGE MODAL ──────────────────────────────────────────
-function NewChallengeModal({ onClose, onCreate }) {
+function NewChallengeModal({ onClose, onCreate, nickname }) {
   const [title,setTitle]=useState(""); const [emoji,setEmoji]=useState("🏋️"); const [desc,setDesc]=useState(""); const [rt,setRT]=useState("day");
   const EMOJIS=["🏋️","🏃","🧘","📚","💧","🌅","🎯","💪","🚴","🍎","✏️","🎸"];
   const submit=()=>{
     if (!title.trim()) return;
-    const creatorName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Создатель";
+    const tgUser = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
+    const creatorName = nickname || tgUser?.first_name || "Создатель";
     onCreate({ id:uid(), title:title.trim(), emoji, desc:desc.trim(), shareCode:mkCode(), recurType:rt, createdAt:today, myStreak:0, myHistory:[], participants:[], _myName:creatorName });
     onClose();
   };
@@ -1707,14 +1708,15 @@ function NewChallengeModal({ onClose, onCreate }) {
 }
 
 // ─── NEW SHARED GOAL MODAL ────────────────────────────────────────
-function NewSharedGoalModal({ onClose, onCreate }) {
+function NewSharedGoalModal({ onClose, onCreate, nickname }) {
   const [title,setTitle]=useState(""); const [itemText,setItemText]=useState("");
   const [items,setItems]=useState([]);
   const addItem=()=>{ if(!itemText.trim()) return; setItems(p=>[...p,{id:uid(),title:itemText.trim(),assignedTo:null,doneBy:null,done:false}]); setItemText(""); };
   const removeItem=id=>setItems(p=>p.filter(x=>x.id!==id));
   const submit=()=>{
     if(!title.trim()||items.length===0) return;
-    onCreate({ id:uid(), title:title.trim(), emoji:"🎯", shareCode:mkCode(), createdAt:today, participants:["Ты"], items });
+    const myName = nickname || "Я";
+    onCreate({ id:uid(), title:title.trim(), emoji:"🎯", shareCode:mkCode(), createdAt:today, participants:[myName], items });
     onClose();
   };
   return (
@@ -1744,7 +1746,7 @@ function NewSharedGoalModal({ onClose, onCreate }) {
 }
 
 // ─── JOIN BY CODE MODAL ───────────────────────────────────────────
-function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
+function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg, nickname }) {
   const [code,setCode]=useState(""); const [result,setResult]=useState(null); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const search=async(c)=>{
     if(!c){setErr("Введи код");return;}
@@ -1768,7 +1770,7 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
   const join=async()=>{
     if(!result) return;
     const tgUser = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
-    const userName = tgUser?.first_name||"Друг";
+    const userName = nickname || tgUser?.first_name || "Друг";
     const tgId = tgUser?.id ? String(tgUser.id) : null;
     if(result.type==="challenge"){
       onJoinCh(result.data);
@@ -1807,10 +1809,10 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg }) {
 }
 
 // ─── CHALLENGE DETAIL MODAL ───────────────────────────────────────
-function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
-  // Всегда берём имя и tgId из Telegram — не из Firebase, чтобы у каждого было своё
+function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname }) {
+  // Никнейм: сначала свой из профиля, затем Telegram, затем сохранённый, затем "Ты"
   const tgUser = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
-  const myName = tgUser?.first_name||ch._myName||"Ты";
+  const myName = nickname || tgUser?.first_name || ch._myName || "Ты";
   const myTgId = tgUser?.id ? String(tgUser.id) : null;
   const myDoneToday = ch.myHistory.includes(today);
   const period = ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно";
@@ -1847,7 +1849,7 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
     ...freshParts.map(p=>({...p, isMe:false})),
   ].sort((a,b)=>b.streak-a.streak);
 
-  const last21 = Array.from({length:21},(_,i)=>pastDay(20-i));
+  const last28 = Array.from({length:28},(_,i)=>pastDay(27-i));
 
   return (
     <ModalOverlay onClose={onClose}>
@@ -1887,11 +1889,11 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
         ))}
       </div>
 
-      {/* Activity heatmap — last 21 days */}
+      {/* Activity heatmap — last 28 days */}
       <div style={{marginBottom:16}}>
-        <SectionLabel>Активность за 3 недели</SectionLabel>
+        <SectionLabel>Активность за 4 недели</SectionLabel>
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
-          {last21.map(d=>{
+          {last28.map(d=>{
             const myD=ch.myHistory.includes(d);
             const friendDs=freshParts.filter(p=>p.history&&p.history.includes(d));
             return (
@@ -1921,7 +1923,8 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete }) {
 }
 
 // ─── SHARED GOAL DETAIL MODAL ─────────────────────────────────────
-function SharedGoalDetail({ sg, onClose, onToggleItem, onAssign, onShare, onDelete }) {
+function SharedGoalDetail({ sg, onClose, onToggleItem, onAssign, onShare, onDelete, nickname }) {
+  const myName = nickname || "Я";
   const done = sg.items.filter(x=>x.done).length;
   const total = sg.items.length;
   const pct = total>0?done/total:0;
@@ -1954,10 +1957,10 @@ function SharedGoalDetail({ sg, onClose, onToggleItem, onAssign, onShare, onDele
               {it.assignedTo && <div style={{fontSize:11,color:it.done?T.teal:T.sub,marginTop:2}}>{it.done?`✓ ${it.doneBy}`:` ${it.assignedTo}`}</div>}
             </div>
             {!it.done && !it.assignedTo && (
-              <div onClick={()=>onAssign(sg.id,it.id,"Ты")} style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:T.purp+"33",color:T.purpL,border:`1px solid ${T.purp}55`,cursor:"pointer",whiteSpace:"nowrap"}}>Беру я</div>
+              <div onClick={()=>onAssign(sg.id,it.id,myName)} style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:T.purp+"33",color:T.purpL,border:`1px solid ${T.purp}55`,cursor:"pointer",whiteSpace:"nowrap"}}>Беру я</div>
             )}
-            {!it.done && it.assignedTo==="Ты" && (
-              <div style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:T.purp+"22",color:T.purpL,border:`1px solid ${T.purp}44`}}>→ Ты</div>
+            {!it.done && it.assignedTo===myName && (
+              <div style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:T.purp+"22",color:T.purpL,border:`1px solid ${T.purp}44`}}>→ {myName}</div>
             )}
           </div>
         ))}
@@ -1973,7 +1976,7 @@ function SharedGoalDetail({ sg, onClose, onToggleItem, onAssign, onShare, onDele
 }
 
 // ─── SOCIAL SCREEN ────────────────────────────────────────────────
-function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg }) {
+function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg, nickname }) {
   const [tab,setTab]=useState("challenges");
   const [showNewCh,setNewCh]=useState(false);
   const [showNewSg,setNewSg]=useState(false);
@@ -1982,17 +1985,19 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
   const [detailSg,setDetailSg]=useState(null);
   const [shareItem,setShare]=useState(null); // {code,title}
 
+  // Имя для отображения — никнейм из профиля, или Telegram, или "Ты"
+  const tgUserSocial = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
+  const myDisplayName = nickname || tgUserSocial?.first_name || "Ты";
+  const myTgId = tgUserSocial?.id ? String(tgUserSocial.id) : null;
+
   // При загрузке экрана — подтягиваем свежих участников из Firebase для всех соревнований
   useEffect(()=>{
-    const tgUser = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
-    const myName = tgUser?.first_name||"Ты";
-    const myTgId = tgUser?.id ? String(tgUser.id) : null;
     challenges.forEach(ch=>{
       if(!ch.shareCode) return;
       cloudGetParticipants(ch.shareCode).then(parts=>{
         const others = myTgId
-          ? parts.filter(p => p.tgId ? p.tgId !== myTgId : p.name !== myName)
-          : parts.filter(p=>p.name!==myName);
+          ? parts.filter(p => p.tgId ? p.tgId !== myTgId : p.name !== myDisplayName)
+          : parts.filter(p=>p.name!==myDisplayName);
         onUpdateCh(ch.id, c=>({...c, participants:others}));
       }).catch(()=>{});
     });
@@ -2016,30 +2021,24 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
         }
       }
       // Синхронизируем прогресс в Firebase — чтобы друг видел обновление
-      const tgUser2 = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
-      const myName = ch._myName || tgUser2?.first_name || "Ты";
-      const myTgId2 = tgUser2?.id ? String(tgUser2.id) : null;
-      if(ch.shareCode) cloudUpdateMyProgress(ch.shareCode, myName, streak, newHistory, myTgId2);
+      if(ch.shareCode) cloudUpdateMyProgress(ch.shareCode, myDisplayName, streak, newHistory, myTgId);
       return {...ch, myHistory:newHistory, myStreak:streak};
     });
   };
 
   const joinCh = chData => {
-    // Джойнер должен хранить СВОЁ имя, а не имя создателя из Firebase
-    const myName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Друг";
     const exists = challenges ? challenges.find(c=>c.id===chData.id||c.shareCode===chData.shareCode) : false;
-    if(exists) onUpdateCh(chData.id, ch=>({...ch, joined:true, _myName:myName}));
-    else onCreateCh({...chData, myStreak:0, myHistory:[], joined:true, _myName:myName});
+    if(exists) onUpdateCh(chData.id, ch=>({...ch, joined:true, _myName:myDisplayName}));
+    else onCreateCh({...chData, myStreak:0, myHistory:[], joined:true, _myName:myDisplayName});
   };
   const joinSg = sgData => {
-    const userName = (typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name)||"Ты";
     const exists = sharedGoals ? sharedGoals.find(s=>s.id===sgData.id||s.shareCode===sgData.shareCode) : false;
-    if(exists) onUpdateSg(sgData.id, sg=>({...sg, participants:[...new Set([...sg.participants,userName])]}));
-    else onCreateSg({...sgData, participants:[...new Set([...(sgData.participants||[]),userName])]});
+    if(exists) onUpdateSg(sgData.id, sg=>({...sg, participants:[...new Set([...sg.participants,myDisplayName])]}));
+    else onCreateSg({...sgData, participants:[...new Set([...(sgData.participants||[]),myDisplayName])]});
   };
 
   const toggleSgItem = (sgId, itemId) => onUpdateSg(sgId, sg=>({
-    ...sg, items:sg.items.map(it=>it.id!==itemId?it:{...it, done:!it.done, doneBy:!it.done?"Ты":null})
+    ...sg, items:sg.items.map(it=>it.id!==itemId?it:{...it, done:!it.done, doneBy:!it.done?myDisplayName:null})
   }));
 
   const assignSgItem = (sgId, itemId, name) => onUpdateSg(sgId, sg=>({
@@ -2047,7 +2046,7 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
   }));
 
   const ChallengeCard = ({ch}) => {
-    const allParts = [{name:"Ты",streak:ch.myStreak,isMe:true},...ch.participants];
+    const allParts = [{name:myDisplayName,streak:ch.myStreak,isMe:true},...ch.participants];
     const top = [...allParts].sort((a,b)=>b.streak-a.streak)[0];
     const myDoneToday=ch.myHistory.includes(today);
     return (
@@ -2081,7 +2080,7 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
 
   const GoalCard = ({sg}) => {
     const done=sg.items.filter(x=>x.done).length, total=sg.items.length;
-    const myDone=sg.items.filter(x=>x.doneBy==="Ты").length;
+    const myDone=sg.items.filter(x=>x.doneBy===myDisplayName).length;
     return (
       <div onClick={()=>setDetailSg(sg)} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"14px 16px",marginBottom:10,cursor:"pointer"}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
@@ -2141,14 +2140,14 @@ function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDelet
       </div>
 
       {/* Modals */}
-      {showNewCh && <NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch);setNewCh(false);}}/>}
-      {showNewSg && <NewSharedGoalModal onClose={()=>setNewSg(false)} onCreate={sg=>{onCreateSg(sg);setNewSg(false);}}/>}
-      {showJoin  && <JoinModal challenges={challenges} sharedGoals={sharedGoals} onClose={()=>setJoin(false)} onJoinCh={joinCh} onJoinSg={joinSg}/>}
+      {showNewCh && <NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch);setNewCh(false);}} nickname={nickname}/>}
+      {showNewSg && <NewSharedGoalModal onClose={()=>setNewSg(false)} onCreate={sg=>{onCreateSg(sg);setNewSg(false);}} nickname={nickname}/>}
+      {showJoin  && <JoinModal challenges={challenges} sharedGoals={sharedGoals} onClose={()=>setJoin(false)} onJoinCh={joinCh} onJoinSg={joinSg} nickname={nickname}/>}
       {shareItem && <ShareSheet code={shareItem.code} title={shareItem.title} onClose={()=>setShare(null)}/>}
-      {detailCh  && <ChallengeDetail ch={detailCh} onClose={()=>setDetailCh(null)}
+      {detailCh  && <ChallengeDetail ch={detailCh} onClose={()=>setDetailCh(null)} nickname={nickname}
           onComplete={completeCh} onShare={()=>{setShare({code:detailCh.shareCode,title:detailCh.title});setDetailCh(null);}}
           onDelete={id=>{onDeleteCh(id);setDetailCh(null);}}/>}
-      {detailSg  && <SharedGoalDetail sg={detailSg} onClose={()=>setDetailSg(null)}
+      {detailSg  && <SharedGoalDetail sg={detailSg} onClose={()=>setDetailSg(null)} nickname={nickname}
           onToggleItem={toggleSgItem} onAssign={assignSgItem}
           onShare={()=>{setShare({code:detailSg.shareCode,title:detailSg.title});setDetailSg(null);}}
           onDelete={id=>{onDeleteSg(id);setDetailSg(null);}}/>}
@@ -2193,7 +2192,7 @@ export default function App() {
   const handleDeleteSg = useCallback(id => setSharedGoals(p=>p.filter(s=>s.id!==id)), []);
   const handleCreateCh = useCallback(ch => {
     const tgUser = typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
-    const myName = ch._myName || tgUser?.first_name || "Создатель";
+    const myName = nickname || ch._myName || tgUser?.first_name || "Создатель";
     const myTgId = tgUser?.id ? String(tgUser.id) : null;
     // Сохраняем создателя как участника в Firebase (чтобы друг его видел)
     const chWithCreator = {
@@ -2204,7 +2203,7 @@ export default function App() {
     cloudSave("challenges", chWithCreator).then(ok => {
       if (!ok) console.error("⚠️ Не удалось сохранить соревнование в облако. Проверь правила Firestore.");
     });
-  }, []);
+  }, [nickname]);
   const handleCreateSg = useCallback(sg => {
     setSharedGoals(p=>[sg,...p]);
     cloudSave("sharedGoals", sg).then(ok => {
@@ -2344,7 +2343,7 @@ export default function App() {
         {tab==="tasks"    && <TasksScreen    tasks={tasks}  onToggle={handleToggle} onSave={handleSave}   onDelete={handleDelete} onShopToggle={handleShopToggle}/>}
         {tab==="overview" && <OverviewScreen tasks={tasks} xp={xp} level={level} rank={RANKS[Math.min(level-1,RANKS.length-1)]} rankIcon={RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)]} xpProgress={progOf(xp)} onEditTask={setOverviewEditTask}/>}
         {tab==="calendar" && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent}/>}
-        {tab==="social"   && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg}/>}
+        {tab==="social"   && <SocialScreen   nickname={nickname} challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg}/>}
         {tab==="profile"  && <ProfileScreen  xp={xp} tasks={tasks} events={events} nickname={nickname} onSetNickname={setNickname}/>}
       </div>
 
