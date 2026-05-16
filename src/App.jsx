@@ -528,7 +528,7 @@ export default function App() {
       {/* Основной контент */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
         <ErrorBoundary key={tab}>
-          {tab === "overview"  && <OverviewScreen tasks={tasks} xp={xp} level={level} rank={RANKS[Math.min(level - 1, RANKS.length - 1)]} rankIcon={RANK_ICONS[Math.min(level - 1, RANK_ICONS.length - 1)]} xpProgress={progOf(xp)} onEditTask={setOverviewEditTask} />}
+          {tab === "overview"  && <OverviewScreen tasks={tasks} xp={xp} level={level} rank={RANKS[Math.min(level - 1, RANKS.length - 1)]} rankIcon={RANK_ICONS[Math.min(level - 1, RANK_ICONS.length - 1)]} xpProgress={progOf(xp)} onEditTask={setOverviewEditTask} onToggle={handleToggle} onSave={handleSave} />}
           {tab === "tasks"     && <TasksScreen tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} />}
           {tab === "calendar"  && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
           {tab === "social"    && <SocialScreen nickname={nickname} challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} />}
