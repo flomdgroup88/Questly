@@ -87,7 +87,7 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
 
   const VISIBLE_ACHIEVEMENTS = 8;
   const [showAllAchievements, setShowAllAchievements] = useState(false);
-  const doneCount=ACHIEVEMENTS.filter(a=>a.done).length;=ACHIEVEMENTS.filter(a=>a.done).length;
+  const doneCount=ACHIEVEMENTS.filter(a=>a.done).length;
 
   const MILESTONE_LEVELS=[1,2,3,5,10,15,20,30,40,50,60,70,80];
   const tableRows=[...new Set([...MILESTONE_LEVELS,level,level+1,level+2])].filter(l=>l>=1&&l<=80).sort((a,b)=>a-b);
