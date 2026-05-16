@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { lvlOf } from "../utils.js";
+import { lvlOf, today } from "../utils.js";
 
 /**
  * Хук управляет состоянием задач, XP и связанными анимациями.
@@ -43,7 +43,13 @@ export function useTasks(initialTasks, initialXP) {
           setXPAnim({ amount: t.xp });
           setTimeout(() => setXPAnim(null), 2200);
 
-          return { ...t, done: true, streak: newStreak };
+          const todayDate = today();
+          const prevHistory = t.doneHistory || [];
+          const doneHistory = prevHistory.includes(todayDate)
+            ? prevHistory
+            : [...prevHistory, todayDate];
+
+          return { ...t, done: true, streak: newStreak, doneHistory };
         }
 
         // Снимаем отметку — XP не уходит в минус, уровень синхронизируем с реальным
@@ -57,9 +63,11 @@ export function useTasks(initialTasks, initialXP) {
         setXPAnim({ amount: t.xp, negative: true });
         setTimeout(() => setXPAnim(null), 2200);
 
+        const todayDate = today();
         return {
           ...t,
           done: false,
+          doneHistory: (t.doneHistory || []).filter(d => d !== todayDate),
           streak: t.streakEnabled
             ? Math.max(0, (t.streak || 0) - 1)
             : (t.streak || 0),

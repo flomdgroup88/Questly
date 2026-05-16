@@ -197,6 +197,8 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
           </>
         )}
       </div>
+      {/* ─── История выполнения ─────────────────────────────── */}
+      <HistoryBlock tasks={tasks} />
       {/* ─── Уведомления ──────────────────────────────────── */}
       <NotificationsBlock
         enabled={notifEnabled}
@@ -231,6 +233,131 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
   );
 }
 
+
+// ─── HISTORY BLOCK ────────────────────────────────────────────────
+function HistoryBlock({ tasks }) {
+  const DAYS = 84; // 12 недель
+  const COLS = 12;
+
+  // Собираем все даты выполнения из всех задач
+  const countByDate = {};
+  tasks.forEach(t => {
+    (t.doneHistory || []).forEach(d => {
+      countByDate[d] = (countByDate[d] || 0) + 1;
+    });
+  });
+
+  // Строим сетку: последние DAYS дней
+  const today_ = new Date();
+  const days = [];
+  for (let i = DAYS - 1; i >= 0; i--) {
+    const d = new Date(today_);
+    d.setDate(d.getDate() - i);
+    const str = d.toISOString().slice(0, 10);
+    days.push({ date: str, count: countByDate[str] || 0 });
+  }
+
+  const maxCount = Math.max(1, ...Object.values(countByDate));
+
+  const getColor = (count) => {
+    if (count === 0) return T.bg0;
+    const intensity = Math.min(count / maxCount, 1);
+    if (intensity < 0.33) return T.purp + "55";
+    if (intensity < 0.66) return T.purp + "99";
+    return T.purp;
+  };
+
+  const totalDaysActive = Object.keys(countByDate).length;
+  const totalDone = Object.values(countByDate).reduce((a, b) => a + b, 0);
+
+  // Текущая серия активных дней подряд
+  let currentStreak = 0;
+  for (let i = 0; i < DAYS; i++) {
+    const d = days[DAYS - 1 - i];
+    if (d.count > 0) currentStreak++;
+    else break;
+  }
+
+  // Разбиваем на строки по COLS
+  const rows = [];
+  for (let i = 0; i < days.length; i += COLS) {
+    rows.push(days.slice(i, i + COLS));
+  }
+
+  const [tooltip, setTooltip] = useState(null);
+
+  return (
+    <div style={{ background: T.bg2, border: `1px solid ${T.brd}`, borderRadius: 14, padding: "16px", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>📅 История выполнения</div>
+        <div style={{ fontSize: 11, color: T.sub }}>{DAYS / 7} недель</div>
+      </div>
+
+      {/* Мини-статы */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {[
+          { label: "Всего выполнено", value: totalDone, color: T.purpL },
+          { label: "Активных дней", value: totalDaysActive, color: T.teal },
+          { label: "Серия сейчас", value: `${currentStreak} 🔥`, color: "#FF6B35" },
+        ].map(s => (
+          <div key={s.label} style={{ flex: 1, background: T.bg0, borderRadius: 10, padding: "10px 8px", textAlign: "center", border: `1px solid ${T.brd}` }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+            <div style={{ fontSize: 10, color: T.dim, marginTop: 4, lineHeight: 1.3 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Хитмап */}
+      <div style={{ overflowX: "auto" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+          {rows.map((row, ri) => (
+            <div key={ri} style={{ display: "flex", gap: 3 }}>
+              {row.map((day) => (
+                <div
+                  key={day.date}
+                  onClick={() => setTooltip(tooltip?.date === day.date ? null : day)}
+                  style={{
+                    flex: 1,
+                    aspectRatio: "1",
+                    borderRadius: 3,
+                    background: getColor(day.count),
+                    border: `1px solid ${day.count > 0 ? T.purp + "44" : T.brdDim}`,
+                    cursor: day.count > 0 ? "pointer" : "default",
+                    transition: "all 0.15s",
+                    minWidth: 18,
+                  }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Тултип при клике */}
+      {tooltip && (
+        <div style={{ marginTop: 10, padding: "8px 12px", background: T.purp + "22", borderRadius: 10, border: `1px solid ${T.purp}44`, fontSize: 12, color: T.purpL, display: "flex", justifyContent: "space-between" }}>
+          <span>📆 {tooltip.date}</span>
+          <span style={{ fontWeight: 700 }}>✅ {tooltip.count} задач выполнено</span>
+        </div>
+      )}
+
+      {/* Легенда */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 10, justifyContent: "flex-end" }}>
+        <span style={{ fontSize: 10, color: T.dim }}>меньше</span>
+        {[0, 0.25, 0.5, 1].map((v, i) => (
+          <div key={i} style={{ width: 12, height: 12, borderRadius: 2, background: getColor(Math.round(v * maxCount)), border: `1px solid ${T.brdDim}` }} />
+        ))}
+        <span style={{ fontSize: 10, color: T.dim }}>больше</span>
+      </div>
+
+      {totalDone === 0 && (
+        <div style={{ textAlign: "center", marginTop: 8, fontSize: 12, color: T.dim }}>
+          Выполняй задачи — здесь появится твоя история 🌱
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── NOTIFICATIONS BLOCK ──────────────────────────────────────────
 function NotificationsBlock({ enabled, reminderTime, permissionState, saving, onEnable, onDisable, onChangeTime }) {
