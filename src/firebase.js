@@ -1,16 +1,18 @@
 // ─── FIREBASE CONFIG ──────────────────────────────────────────────
+// Ключи берутся из файла .env (не из кода!)
+// Vite автоматически подставляет переменные с префиксом VITE_
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot, runTransaction } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC28BBF4vQcHXOEezxJ2LG2hOxRfyWLqoU",
-  authDomain: "questly-social.firebaseapp.com",
-  projectId: "questly-social",
-  storageBucket: "questly-social.firebasestorage.app",
-  messagingSenderId: "1091098265991",
-  appId: "1:1091098265991:web:cfd2817f25ad963dc82b22",
-  measurementId: "G-944C4YQF3S"
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app  = initializeApp(firebaseConfig);
