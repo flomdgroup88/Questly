@@ -48,8 +48,13 @@ export const saveSocial = s => { try { localStorage.setItem(LS_SOC,JSON.stringif
 export const today = todayStr();
 
 export const autoRollover = (tasks) => tasks.map(t => {
-  if(!t.done && t.dueDate<today && !t.recurring)
-    return {...t, dueDate:today, rolledOver:true, streak:0};
+  // Не-повторяющиеся просроченные задачи — переносим на сегодня
+  if (!t.done && t.dueDate < today && !t.recurring)
+    return {...t, dueDate: today, rolledOver: true, streak: 0};
+  // Повторяющиеся пропущенные задачи — сбрасываем серию.
+  // Новый экземпляр на сегодня создаст spawnRecurring уже с streak:0.
+  if (!t.done && t.dueDate < today && t.recurring && t.streakEnabled)
+    return {...t, streak: 0};
   return t;
 });
 
@@ -59,7 +64,7 @@ export const spawnRecurring = (tasks, events, day) => {
     const ok=t.recurType==="day"
       ||(t.recurType==="week" && new Date(t.dueDate).getDay()===new Date(day).getDay())
       ||(t.recurType==="year" && t.dueDate.slice(5)===day.slice(5));
-    if(ok && !next.some(x=>x.title===t.title&&x.dueDate===day)){
+    if(ok && !next.some(x=>x.title===t.title&&x.dueDate===day&&x.period===t.period&&x.recurType===t.recurType)){
       let inheritedStreak=0;
       if(t.streakEnabled){
         const doneInstances=tasks.filter(x=>x.title===t.title&&x.streakEnabled&&x.done).sort((a,b)=>b.dueDate.localeCompare(a.dueDate));

@@ -46,8 +46,12 @@ export function useTasks(initialTasks, initialXP) {
           return { ...t, done: true, streak: newStreak };
         }
 
-        // Снимаем отметку — XP не уходит в минус
-        setXP((prevXP) => Math.max(0, prevXP - t.xp));
+        // Снимаем отметку — XP не уходит в минус, уровень синхронизируем с реальным
+        setXP((prevXP) => {
+          const newXP = Math.max(0, prevXP - t.xp);
+          prevLvlRef.current = lvlOf(newXP);
+          return newXP;
+        });
 
         return {
           ...t,
