@@ -57,7 +57,7 @@ export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
               <span style={{fontSize:10,color:T.dim,fontWeight:600}}>🔥 серия</span>
             )}
             {task.rolledOver&&!task.done&&<span style={{fontSize:10,color:T.gold,fontWeight:600}}>↩ перенесено</span>}
-            {task.dueDate&&task.dueDate!==today&&task.period==="day"&&(
+            {task.dueDate&&task.dueDate!==today()&&task.period==="day"&&(
               <span style={{fontSize:10,color:T.sub}}>📅 {fmtDate(task.dueDate)}</span>
             )}
             {task.dueDate&&task.period!=="day"&&!task.done&&(

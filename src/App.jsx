@@ -28,8 +28,10 @@ if (tg) {
 }
 
 export default function App() {
-  const saved    = loadState();
-  const savedSoc = loadSocial();
+  // useState(() => fn) — читает localStorage только один раз при монтировании,
+  // а не при каждой перерисовке компонента.
+  const [saved]    = useState(() => loadState());
+  const [savedSoc] = useState(() => loadSocial());
 
   // ── Задачи и XP — через хук ───────────────────────────────────────
   const {
@@ -55,7 +57,7 @@ export default function App() {
   // events здесь — начальное значение из localStorage, не меняется в этом эффекте.
   // Если добавить [events] в deps, то при каждом новом событии все задачи пересчитаются — баг.
   useEffect(() => {
-    setTasks((prev) => spawnRecurring(autoRollover(prev), events, today));
+    setTasks((prev) => spawnRecurring(autoRollover(prev), events, today()));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Сохранение в localStorage при каждом изменении ───────────────
@@ -67,7 +69,7 @@ export default function App() {
   }, [xp, tasks, events, nickname, challenges, sharedGoals]);
 
   // ── Облачный синк — через хук ─────────────────────────────────────
-  const { syncStatus, syncIcon } = useCloudSync({
+  const { syncStatus, syncIcon, isLoading, showOfflineToast } = useCloudSync({
     xp,
     tasks,
     events,
@@ -185,19 +187,62 @@ export default function App() {
         @keyframes xpFloat{0%{opacity:0;transform:translateY(10px) scale(.7)}15%{opacity:1;transform:translateY(-5px) scale(1.2)}70%{opacity:1;transform:translateY(-50px) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(.8)}}
         @keyframes lvlGlow{0%,100%{opacity:0;transform:scale(.8)}20%,80%{opacity:1;transform:scale(1)}}
         @keyframes sparkle{0%{transform:rotate(0deg) scale(1)}50%{transform:rotate(180deg) scale(1.1)}100%{transform:rotate(360deg) scale(1)}}
+        @keyframes toastSlide{0%{opacity:0;transform:translateX(-50%) translateY(20px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}85%{opacity:1;transform:translateX(-50%) translateY(0)}100%{opacity:0;transform:translateX(-50%) translateY(10px)}}
       `}</style>
 
-      {/* Анимация +XP */}
+      {/* ── Экран загрузки ── показываем пока Firebase не ответил ─── */}
+      {isLoading && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 500,
+          background: T.bg0, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", gap: 16,
+        }}>
+          <div style={{ fontSize: 48, animation: "sparkle 1.5s linear infinite" }}>⚡</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: T.purpL, letterSpacing: "-0.02em" }}>
+            <span style={{ color: T.gold }}>Q</span>uestly
+          </div>
+          <div style={{ fontSize: 13, color: T.sub }}>Загружаем твои квесты…</div>
+        </div>
+      )}
+
+      {/* ── Тост «нет интернета» ──────────────────────────────────── */}
+      {showOfflineToast && (
+        <div style={{
+          position: "fixed", bottom: 80, left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 400, pointerEvents: "none",
+          animation: "toastSlide 4s ease forwards",
+          background: T.bg1, border: `1px solid ${T.rose}55`,
+          borderRadius: 24, padding: "10px 18px",
+          display: "flex", alignItems: "center", gap: 8,
+          whiteSpace: "nowrap", boxShadow: `0 4px 20px #0008`,
+        }}>
+          <span style={{ fontSize: 16 }}>📶</span>
+          <span style={{ fontSize: 13, color: T.sub }}>
+            Нет соединения — данные сохранены локально
+          </span>
+        </div>
+      )}
+
+      {/* Анимация +XP / −XP */}
       {xpAnim && (
         <div style={{
           position: "fixed", top: "25%", left: "50%", transform: "translateX(-50%)",
           zIndex: 300, pointerEvents: "none", textAlign: "center",
           animation: "xpFloat 2.2s ease forwards",
         }}>
-          <div style={{ fontSize: 32, fontWeight: 900, color: T.gold, textShadow: `0 0 30px ${T.gold},0 0 60px ${T.gold}88` }}>
-            +{xpAnim.amount} XP
+          <div style={{
+            fontSize: 32, fontWeight: 900,
+            color: xpAnim.negative ? T.rose : T.gold,
+            textShadow: xpAnim.negative
+              ? `0 0 30px ${T.rose},0 0 60px ${T.rose}88`
+              : `0 0 30px ${T.gold},0 0 60px ${T.gold}88`,
+          }}>
+            {xpAnim.negative ? "−" : "+"}{xpAnim.amount} XP
           </div>
-          <div style={{ fontSize: 14, color: T.goldL, marginTop: 2 }}>✨ Квест выполнен!</div>
+          <div style={{ fontSize: 14, color: xpAnim.negative ? T.rose : T.goldL, marginTop: 2 }}>
+            {xpAnim.negative ? "↩️ Квест отменён" : "✨ Квест выполнен!"}
+          </div>
         </div>
       )}
 

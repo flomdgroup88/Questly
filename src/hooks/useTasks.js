@@ -53,6 +53,10 @@ export function useTasks(initialTasks, initialXP) {
           return newXP;
         });
 
+        // Показываем анимацию −XP, чтобы пользователь видел списание
+        setXPAnim({ amount: t.xp, negative: true });
+        setTimeout(() => setXPAnim(null), 2200);
+
         return {
           ...t,
           done: false,

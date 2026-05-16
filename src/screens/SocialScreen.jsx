@@ -13,7 +13,7 @@ function NewChallengeModal({ onClose, onCreate, nickname }) {
     if(!title.trim()) return;
     const tgUser=typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
     const creatorName=nickname||tgUser?.first_name||"Создатель";
-    onCreate({id:uid(),title:title.trim(),emoji,desc:desc.trim(),shareCode:mkCode(),recurType:rt,createdAt:today,myStreak:0,myHistory:[],participants:[],_myName:creatorName});
+    onCreate({id:uid(),title:title.trim(),emoji,desc:desc.trim(),shareCode:mkCode(),recurType:rt,createdAt:today(),myStreak:0,myHistory:[],participants:[],_myName:creatorName});
     onClose();
   };
   return (
@@ -43,7 +43,7 @@ function NewSharedGoalModal({ onClose, onCreate, nickname }) {
   const addItem=()=>{if(!itemText.trim())return;setItems(p=>[...p,{id:uid(),title:itemText.trim(),assignedTo:null,doneBy:null,done:false}]);setItemText("");};
   const submit=()=>{
     if(!title.trim()||items.length===0) return;
-    onCreate({id:uid(),title:title.trim(),emoji:"🎯",shareCode:mkCode(),createdAt:today,participants:[nickname||"Я"],items});
+    onCreate({id:uid(),title:title.trim(),emoji:"🎯",shareCode:mkCode(),createdAt:today(),participants:[nickname||"Я"],items});
     onClose();
   };
   return (
@@ -135,7 +135,7 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname 
   const tgUser=typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
   const myName=nickname||tgUser?.first_name||ch._myName||"Ты";
   const myTgId=tgUser?.id?String(tgUser.id):null;
-  const myDoneToday=ch.myHistory.includes(today);
+  const myDoneToday=ch.myHistory.includes(today());
   const period=ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно";
   const [freshParts,setFreshParts]=useState(ch.participants||[]);
   const [syncing,setSyncing]=useState(false);
@@ -289,12 +289,12 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
 
   const completeCh=id=>{
     onUpdateCh(id,ch=>{
-      if(ch.myHistory.includes(today)) return ch;
-      const newHistory=[...ch.myHistory,today];
+      if(ch.myHistory.includes(today())) return ch;
+      const newHistory=[...(ch.myHistory),today()];
       let streak=0;
       const sorted=[...newHistory].sort();
-      if(sorted[sorted.length-1]===today){
-        let cur=today;streak=1;
+      if(sorted[sorted.length-1]===today()){
+        let cur=today();streak=1;
         while(true){const d=new Date(cur);d.setDate(d.getDate()-1);const prev=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(sorted.includes(prev)){streak++;cur=prev;}else break;}
       }
       if(ch.shareCode) cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,newHistory,myTgId);
@@ -318,7 +318,7 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
 
   const ChallengeCard=({ch})=>{
     const allParts=[{name:myDisplayName,streak:ch.myStreak,isMe:true},...ch.participants];
-    const myDoneToday=ch.myHistory.includes(today);
+    const myDoneToday=ch.myHistory.includes(today());
     return (
       <div onClick={()=>setDetailCh(ch)} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"14px 16px",marginBottom:10,cursor:"pointer"}}>
         <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>

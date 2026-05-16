@@ -12,6 +12,8 @@ const CLOUD_DEBOUNCE_MS = 4000;
  * Возвращает:
  *  - syncStatus: "idle" | "saving" | "saved" | "error"
  *  - syncIcon: эмодзи для отображения статуса
+ *  - isLoading: true пока идёт первичная загрузка из Firebase
+ *  - showOfflineToast: true когда нет соединения с облаком
  */
 export function useCloudSync({
   xp,
@@ -22,25 +24,33 @@ export function useCloudSync({
   onCloudLoaded,
 }) {
   const [syncStatus, setSyncStatus] = useState("idle");
+  // isLoading: true с момента запуска до завершения первого запроса к Firebase.
+  // Позволяет показать экран-заглушку, пока данные ещё не пришли из облака.
+  const [isLoading, setIsLoading] = useState(true);
+  // showOfflineToast: показывается на 4 сек после ошибки сохранения.
+  const [showOfflineToast, setShowOfflineToast] = useState(false);
+  const offlineToastTimer = useRef(null);
   const userKeyRef = useRef(null);
   const syncTimerRef = useRef(null);
 
   // ── Инициализация: auth + загрузка облачных данных ───────────────
   useEffect(() => {
     initUserSync().then(async (key) => {
-      if (!key) return;
+      if (!key) {
+        // Firebase недоступен сразу — показываем локальные данные
+        setIsLoading(false);
+        return;
+      }
       userKeyRef.current = key;
 
       const cloud = await cloudLoadUserData(key);
-      if (!cloud) return; // первый запуск — облако пустое
 
-      const cloudTime = cloud._savedAt ?? 0;
-
-      if (cloudTime > savedLocalTime) {
+      const cloudTime = cloud?._savedAt ?? 0;
+      if (cloud && cloudTime > savedLocalTime) {
         // Облако актуальнее localStorage → применяем
         onCloudLoaded({
           tasks: cloud.tasks
-            ? spawnRecurring(autoRollover(cloud.tasks), cloud.events ?? [], today)
+            ? spawnRecurring(autoRollover(cloud.tasks), cloud.events ?? [], today())
             : null,
           events: cloud.events ?? null,
           xp: cloud.xp ?? null,
@@ -48,6 +58,12 @@ export function useCloudSync({
         });
         setSyncStatus("saved");
       }
+
+      // Загрузка завершена — скрываем экран ожидания
+      setIsLoading(false);
+    }).catch(() => {
+      // Любая ошибка инициализации — показываем локальные данные
+      setIsLoading(false);
     });
   // Запускается один раз при монтировании — savedLocalTime и onCloudLoaded
   // намеренно не в зависимостях: они не меняются после первого рендера.
@@ -70,8 +86,18 @@ export function useCloudSync({
         nickname,
         _savedAt: Date.now(),
       });
-      setSyncStatus(ok ? "saved" : "error");
-      setTimeout(() => setSyncStatus("idle"), 3000);
+
+      if (ok) {
+        setSyncStatus("saved");
+        setTimeout(() => setSyncStatus("idle"), 3000);
+      } else {
+        setSyncStatus("error");
+        // Показываем тост «нет соединения» на 4 секунды
+        clearTimeout(offlineToastTimer.current);
+        setShowOfflineToast(true);
+        offlineToastTimer.current = setTimeout(() => setShowOfflineToast(false), 4000);
+        setTimeout(() => setSyncStatus("idle"), 3000);
+      }
     }, CLOUD_DEBOUNCE_MS);
 
     return () => clearTimeout(syncTimerRef.current);
@@ -82,5 +108,5 @@ export function useCloudSync({
     syncStatus === "saved"  ? "☁️✓" :
     syncStatus === "error"  ? "⚠️" : null;
 
-  return { syncStatus, syncIcon };
+  return { syncStatus, syncIcon, isLoading, showOfflineToast };
 }

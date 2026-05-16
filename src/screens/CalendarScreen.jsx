@@ -90,7 +90,7 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
 
       <div style={{flex:1,overflowY:"auto",padding:"12px 16px",WebkitOverflowScrolling:"touch"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-          <div style={{fontSize:14,fontWeight:700,color:T.text}}>{selDate===today?"📅 Сегодня":`📅 ${fmtDate(selDate)}`}</div>
+          <div style={{fontSize:14,fontWeight:700,color:T.text}}>{selDate===today()?"📅 Сегодня":`📅 ${fmtDate(selDate)}`}</div>
           <div onClick={()=>setModal(true)} style={{padding:"6px 14px",borderRadius:20,cursor:"pointer",fontSize:12,fontWeight:700,background:T.teal+"22",color:T.teal,border:`1px solid ${T.teal}55`}}>+ Событие</div>
         </div>
 

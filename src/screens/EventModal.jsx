@@ -9,7 +9,7 @@ export default function EventModal({ onClose, onCreate, onUpdate, onDelete, defa
   const [step,  setStep] =useState(isEdit?"details":"type");
   const [typeId,setTypeId]=useState(existing?.eventType||null);
   const [title, setTitle]=useState(existing?.title||"");
-  const [date,  setDate] =useState(existing?.date||defaultDate||today);
+  const [date,  setDate] =useState(existing?.date||defaultDate||today());
   const [rec,   setRec]  =useState(existing?.recurring||false);
   const [rt,    setRT]   =useState(existing?.recurType||"week");
   const [color, setColor]=useState(existing?.color||T.sky);
@@ -104,7 +104,7 @@ export default function EventModal({ onClose, onCreate, onUpdate, onDelete, defa
 
       {previewTasks.length>0&&(
         <div style={{background:T.bg0,border:`1px solid ${T.brd}`,borderRadius:11,padding:"10px 13px",marginBottom:16}}>
-          <div style={{fontSize:11,fontWeight:700,color:T.sub,letterSpacing:"0.06em",marginBottom:7,textTransform:"uppercase"}}>Автозадачи на {date===today?"сегодня":fmtDate(date)}</div>
+          <div style={{fontSize:11,fontWeight:700,color:T.sub,letterSpacing:"0.06em",marginBottom:7,textTransform:"uppercase"}}>Автозадачи на {date===today()?"сегодня":fmtDate(date)}</div>
           {previewTasks.map((t,i)=>(
             <div key={i} style={{fontSize:13,color:T.text,padding:"3px 0",borderBottom:i<previewTasks.length-1?`1px solid ${T.brd}`:"none"}}>{t.title}</div>
           ))}

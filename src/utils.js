@@ -45,15 +45,17 @@ export const loadSocial = () => { try { const r=localStorage.getItem(LS_SOC); re
 export const saveSocial = s => { try { localStorage.setItem(LS_SOC,JSON.stringify(s)); } catch {} };
 
 // ─── TASK LOGIC ───────────────────────────────────────────────────
-export const today = todayStr();
+// today() — всегда возвращает актуальную дату, не замораживается при старте.
+export const today = todayStr;
 
 export const autoRollover = (tasks) => tasks.map(t => {
+  const now = today();
   // Не-повторяющиеся просроченные задачи — переносим на сегодня
-  if (!t.done && t.dueDate < today && !t.recurring)
-    return {...t, dueDate: today, rolledOver: true, streak: 0};
+  if (!t.done && t.dueDate < now && !t.recurring)
+    return {...t, dueDate: now, rolledOver: true, streak: 0};
   // Повторяющиеся пропущенные задачи — сбрасываем серию.
   // Новый экземпляр на сегодня создаст spawnRecurring уже с streak:0.
-  if (!t.done && t.dueDate < today && t.recurring && t.streakEnabled)
+  if (!t.done && t.dueDate < now && t.recurring && t.streakEnabled)
     return {...t, streak: 0};
   return t;
 });
@@ -64,10 +66,13 @@ export const spawnRecurring = (tasks, events, day) => {
     const ok=t.recurType==="day"
       ||(t.recurType==="week" && new Date(t.dueDate).getDay()===new Date(day).getDay())
       ||(t.recurType==="year" && t.dueDate.slice(5)===day.slice(5));
-    if(ok && !next.some(x=>x.title===t.title&&x.dueDate===day&&x.period===t.period&&x.recurType===t.recurType)){
+    // Используем templateId для дедупликации — надёжнее, чем сравнение по названию.
+    // Задачи с одинаковым названием больше не блокируют друг друга.
+    const tplId = t.templateId || t.id;
+    if(ok && !next.some(x=>x.dueDate===day&&(x.templateId||x.id)===tplId)){
       let inheritedStreak=0;
       if(t.streakEnabled){
-        const doneInstances=tasks.filter(x=>x.title===t.title&&x.streakEnabled&&x.done).sort((a,b)=>b.dueDate.localeCompare(a.dueDate));
+        const doneInstances=tasks.filter(x=>(x.templateId||x.id)===tplId&&x.streakEnabled&&x.done).sort((a,b)=>b.dueDate.localeCompare(a.dueDate));
         if(doneInstances.length>0){
           const lastDone=doneInstances[0];
           const diffDays=Math.round((new Date(day)-new Date(lastDone.dueDate))/86400000);
@@ -75,7 +80,8 @@ export const spawnRecurring = (tasks, events, day) => {
           inheritedStreak=cont?(lastDone.streak||0):0;
         }
       }
-      next.unshift({...t,id:uid(),done:false,dueDate:day,streak:inheritedStreak,rolledOver:false});
+      // templateId хранит id задачи-шаблона, чтобы все экземпляры были связаны.
+      next.unshift({...t,id:uid(),templateId:tplId,done:false,dueDate:day,streak:inheritedStreak,rolledOver:false});
     }
   });
   events.filter(e=>e.recurring).forEach(ev=>{
@@ -118,7 +124,7 @@ export const INIT_SHARED_GOALS = [
     title:"Ужин в пятницу 🍷",
     emoji:"🛒",
     shareCode:mkCode(),
-    createdAt:today,
+    createdAt:today(),
     participants:["Ты","Маша"],
     items:[
       {id:uid(),title:"Вино 🍷",        assignedTo:"Ты",   doneBy:"Ты",   done:true },
@@ -131,15 +137,15 @@ export const INIT_SHARED_GOALS = [
 ];
 
 export const INIT_TASKS = [
-  {id:uid(),title:"Утренняя зарядка",     period:"day",  done:false,xp:15, dueDate:today,recurring:true, recurType:"day", streakEnabled:true, streak:0},
-  {id:uid(),title:"Прочитать 20 страниц", period:"day",  done:true, xp:15, dueDate:today,recurring:false,recurType:"",   streakEnabled:false,streak:0},
-  {id:uid(),title:"Подготовить отчёт",    period:"week", done:false,xp:50, dueDate:today,recurring:false,recurType:"",   streakEnabled:false,streak:0},
-  {id:uid(),title:"Пройти курс по React", period:"month",done:false,xp:150,dueDate:today,recurring:false,recurType:"",   streakEnabled:false,streak:0},
-  {id:uid(),title:"Запустить проект",     period:"year", done:false,xp:600,dueDate:today,recurring:false,recurType:"",   streakEnabled:false,streak:0},
+  {id:uid(),title:"Утренняя зарядка",     period:"day",  done:false,xp:15, dueDate:today(),recurring:true, recurType:"day", streakEnabled:true, streak:0},
+  {id:uid(),title:"Прочитать 20 страниц", period:"day",  done:true, xp:15, dueDate:today(),recurring:false,recurType:"",   streakEnabled:false,streak:0},
+  {id:uid(),title:"Подготовить отчёт",    period:"week", done:false,xp:50, dueDate:today(),recurring:false,recurType:"",   streakEnabled:false,streak:0},
+  {id:uid(),title:"Пройти курс по React", period:"month",done:false,xp:150,dueDate:today(),recurring:false,recurType:"",   streakEnabled:false,streak:0},
+  {id:uid(),title:"Запустить проект",     period:"year", done:false,xp:600,dueDate:today(),recurring:false,recurType:"",   streakEnabled:false,streak:0},
 ];
 
 export const INIT_EVENTS = [
-  {id:uid(),title:"ДР Алексея",       date:today,recurring:true, recurType:"year",isBirthday:true, color:"#F59E0B",eventType:"birthday"},
-  {id:uid(),title:"Созвон с командой",date:today,recurring:true, recurType:"week",isBirthday:false,color:"#38BDF8",eventType:"meeting" },
-  {id:uid(),title:"Дедлайн проекта",  date:today,recurring:false,recurType:"",   isBirthday:false,color:"#F43F5E",eventType:"deadline"},
+  {id:uid(),title:"ДР Алексея",       date:today(),recurring:true, recurType:"year",isBirthday:true, color:"#F59E0B",eventType:"birthday"},
+  {id:uid(),title:"Созвон с командой",date:today(),recurring:true, recurType:"week",isBirthday:false,color:"#38BDF8",eventType:"meeting" },
+  {id:uid(),title:"Дедлайн проекта",  date:today(),recurring:false,recurType:"",   isBirthday:false,color:"#F43F5E",eventType:"deadline"},
 ];

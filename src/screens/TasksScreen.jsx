@@ -26,7 +26,7 @@ export default function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopT
     if (filter === "tomorrow") return t.period === "day" && t.dueDate === tmrw;
     if (t.period !== filter) return false;
     if (!t.dueDate) return filter === "day";
-    if (filter === "day")   return t.dueDate === today;
+    if (filter === "day")   return t.dueDate === today();
     if (filter === "week")  return isInCurrentWeek(t.dueDate);
     if (filter === "month") return isInCurrentMonth(t.dueDate);
     if (filter === "year")  return isInCurrentYear(t.dueDate);
