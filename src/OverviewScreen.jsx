@@ -79,40 +79,8 @@ function DragHandle({ active, onStart }) {
 }
 
 // ─── Task Row ─────────────────────────────────────────────────────
-function TaskRow({ task, num, accent, activeTab, isDragging, isDropTarget, onDragHandleStart, onEdit, onToggle, onSave }) {
-  const [editing,   setEditing]   = useState(false);
-  const [editTitle, setEditTitle] = useState(task.title);
-  const [checking,  setChecking]  = useState(false);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (!editing) setEditTitle(task.title);
-  }, [task.title, editing]);
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      const len = inputRef.current.value.length;
-      inputRef.current.setSelectionRange(len, len);
-    }
-  }, [editing]);
-
-  const startEdit = () => {
-    setEditTitle(task.title);
-    setEditing(true);
-  };
-
-  const saveEdit = () => {
-    const trimmed = editTitle.trim();
-    if (!trimmed) { cancelEdit(); return; }
-    onSave({ ...task, title: trimmed });
-    setEditing(false);
-  };
-
-  const cancelEdit = () => {
-    setEditTitle(task.title);
-    setEditing(false);
-  };
+function TaskRow({ task, num, accent, activeTab, isDragging, isDropTarget, onDragHandleStart, onEdit, onToggle }) {
+  const [checking, setChecking] = useState(false);
 
   const handleCheck = e => {
     e.stopPropagation();
@@ -127,167 +95,74 @@ function TaskRow({ task, num, accent, activeTab, isDragging, isDropTarget, onDra
 
   return (
     <div style={{
-      display:"flex", alignItems: editing ? "flex-start" : "center",
+      display:"flex", alignItems:"center",
       gap:8,
-      padding: editing ? "10px 10px 10px 6px" : "12px 12px 12px 6px",
-      background: isDragging ? T.bg3 : editing ? T.bg3 : "transparent",
-      borderBottom:`1px solid ${isDropTarget ? accent+"77" : editing ? T.purp+"44" : T.brdDim}`,
-      boxShadow: isDropTarget
-        ? `inset 3px 0 0 ${accent}`
-        : editing
-          ? `inset 3px 0 0 ${T.purp}, 0 0 0 1px ${T.purp}22`
-          : "inset 3px 0 0 transparent",
+      padding:"12px 12px 12px 6px",
+      background: isDragging ? T.bg3 : "transparent",
+      borderBottom:`1px solid ${isDropTarget ? accent+"77" : T.brdDim}`,
+      boxShadow: isDropTarget ? `inset 3px 0 0 ${accent}` : "inset 3px 0 0 transparent",
       opacity: isDragging ? 0.4 : 1,
       transition:"opacity 0.12s, box-shadow 0.12s, background 0.15s",
     }}>
 
       {/* Drag handle */}
-      {!editing && <DragHandle active={isDragging} onStart={onDragHandleStart}/>}
-      {editing  && <div style={{width:16, flexShrink:0}}/>}
+      <DragHandle active={isDragging} onStart={onDragHandleStart}/>
 
       {/* Number badge */}
       <div style={{
         minWidth:22, height:22, borderRadius:"50%",
-        background: editing ? T.purp+"22" : T.bg3,
-        border:`1px solid ${editing ? T.purp+"66" : T.brd}`,
+        background: T.bg3,
+        border:`1px solid ${T.brd}`,
         display:"flex", alignItems:"center", justifyContent:"center",
         fontSize:10, fontWeight:800,
-        color: editing ? T.purpL : T.sub,
+        color: T.sub,
         flexShrink:0, letterSpacing:"-0.02em",
-        transition:"all 0.2s",
-        marginTop: editing ? 9 : 0,
       }}>
         {num}
       </div>
 
-      {/* Content / Editor */}
+      {/* Content — тап открывает TaskModal */}
       <div
-        style={{flex:1, minWidth:0, cursor: editing ? "default" : "pointer"}}
-        onClick={!editing ? startEdit : undefined}
+        style={{flex:1, minWidth:0, cursor:"pointer"}}
+        onClick={() => onEdit(task)}
       >
-        {editing ? (
-          <div onClick={e => e.stopPropagation()}>
-            <div style={{position:"relative", marginBottom:8}}>
-              <input
-                ref={inputRef}
-                value={editTitle}
-                onChange={e => setEditTitle(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter")  saveEdit();
-                  if (e.key === "Escape") cancelEdit();
-                }}
-                style={{
-                  width:"100%", boxSizing:"border-box",
-                  padding:"8px 34px 8px 10px",
-                  background:T.bg0,
-                  border:`1.5px solid ${T.purp}`,
-                  borderRadius:9, color:T.text,
-                  fontSize:15, outline:"none",
-                  colorScheme:"dark", fontFamily:"inherit",
-                }}
-              />
-              {editTitle.length > 0 && (
-                <div
-                  onClick={() => setEditTitle("")}
-                  style={{
-                    position:"absolute", right:10, top:"50%",
-                    transform:"translateY(-50%)",
-                    fontSize:13, color:T.dim, cursor:"pointer",
-                  }}
-                >✕</div>
-              )}
-            </div>
-
-            <div style={{display:"flex", gap:6}}>
-              <div
-                onClick={cancelEdit}
-                style={{
-                  padding:"6px 12px", borderRadius:8, cursor:"pointer",
-                  background:T.bg1, border:`1px solid ${T.brd}`,
-                  color:T.sub, fontSize:12, fontWeight:600, flexShrink:0,
-                }}
-              >Отмена</div>
-
-              <div
-                onClick={saveEdit}
-                style={{
-                  flex:1, padding:"6px 0", borderRadius:8, textAlign:"center",
-                  cursor: editTitle.trim() ? "pointer" : "not-allowed",
-                  background: editTitle.trim()
-                    ? `linear-gradient(135deg,${T.purp},${T.purpL}88)`
-                    : T.bg1,
-                  color: editTitle.trim() ? "#fff" : T.dim,
-                  fontSize:12, fontWeight:700, transition:"all 0.2s",
-                }}
-              >✓ Сохранить</div>
-
-              <div
-                onClick={e => { e.stopPropagation(); setEditing(false); onEdit(); }}
-                title="Все настройки"
-                style={{
-                  width:32, height:32, borderRadius:8, flexShrink:0,
-                  display:"flex", alignItems:"center", justifyContent:"center",
-                  background:T.bg1, border:`1px solid ${T.brd}`,
-                  color:T.sub, fontSize:15, cursor:"pointer",
-                }}
-              >⚙️</div>
-            </div>
-
-            <div style={{fontSize:10, color:T.dim, marginTop:6, paddingLeft:1}}>
-              Enter — сохранить · Esc — отмена
-            </div>
+        <div style={{
+          fontSize:15, fontWeight:500, color:T.text,
+          lineHeight:1.35, letterSpacing:"-0.01em",
+          wordBreak:"break-word",
+        }}>
+          {task.title}
+        </div>
+        {due && (
+          <div style={{fontSize:11, color:due.color, marginTop:3, fontWeight:500}}>
+            {due.label}
           </div>
-        ) : (
-          <>
-            <div style={{
-              fontSize:15, fontWeight:500, color:T.text,
-              lineHeight:1.35, letterSpacing:"-0.01em",
-              wordBreak:"break-word",
-              display:"flex", alignItems:"center", gap:4,
-            }}>
-              <span>{task.title}</span>
-              <span style={{fontSize:10, color:T.dim, opacity:0.5}}>✏️</span>
-            </div>
-            {due && (
-              <div style={{fontSize:11, color:due.color, marginTop:3, fontWeight:500}}>
-                {due.label}
-              </div>
-            )}
-          </>
         )}
       </div>
 
-      {/* ── Чекбокс-галочка справа ── */}
-      {!editing && (
-        <div
-          onClick={handleCheck}
-          style={{
-            width:34, height:34, borderRadius:10, flexShrink:0,
-            border:`2.5px solid ${checking ? accent : T.brd}`,
-            background: checking ? accent+"33" : T.bg3,
-            cursor:"pointer",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            transition:"all 0.25s cubic-bezier(.34,1.56,.64,1)",
-            boxShadow: checking ? `0 0 14px ${accent}66` : "none",
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-            style={{ opacity: checking ? 1 : 0.2, transition:"opacity 0.2s" }}
-          >
-            <path
-              d="M2.5 7.5L5.5 10.5L11.5 3.5"
-              stroke={checking ? accent : T.sub}
-              strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-      )}
+      {/* ── Кружок "отметить выполненным" ── */}
+      <div
+        onClick={handleCheck}
+        style={{
+          width:30, height:30, borderRadius:"50%", flexShrink:0,
+          border:`2.5px solid ${checking ? accent : T.dim}`,
+          background: checking ? accent : "transparent",
+          cursor:"pointer",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          transition:"all 0.25s cubic-bezier(.34,1.56,.64,1)",
+          boxShadow: checking ? `0 0 12px ${accent}66` : "none",
+        }}
+      >
+        {checking && (
+          <span style={{fontSize:13, color:"#000", fontWeight:900}}>✓</span>
+        )}
+      </div>
     </div>
   );
 }
 
 // ─── Draggable List ───────────────────────────────────────────────
-function DraggableList({ tasks, accent, activeTab, orderMap, sectionKey, onReorder, onEditTask, onToggle, onSave }) {
+function DraggableList({ tasks, accent, activeTab, orderMap, sectionKey, onReorder, onEditTask, onToggle }) {
   const [draggingIdx, setDraggingIdx] = useState(null);
   const [overIdx,     setOverIdx]     = useState(null);
   const listRef = useRef(null);
@@ -367,9 +242,8 @@ function DraggableList({ tasks, accent, activeTab, orderMap, sectionKey, onReord
             isDragging={draggingIdx === idx}
             isDropTarget={overIdx === idx && draggingIdx !== idx}
             onDragHandleStart={e => startDrag(e, idx)}
-            onEdit={() => onEditTask && onEditTask(task)}
+            onEdit={t => onEditTask && onEditTask(t)}
             onToggle={onToggle}
-            onSave={onSave}
           />
         </div>
       ))}
@@ -401,7 +275,6 @@ export default function OverviewScreen({
   xpProgress = 0,
   onEditTask,
   onToggle,
-  onSave,
 }) {
   const [activeTab, setActiveTab] = useState("day");
   const [orderMap,  setOrderMap]  = useState(loadOrder);
@@ -538,7 +411,6 @@ export default function OverviewScreen({
           onReorder={handleReorder}
           onEditTask={onEditTask}
           onToggle={onToggle}
-          onSave={onSave}
         />
         <div style={{height:24}}/>
       </div>
