@@ -1,14 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-
-const T = {
-  bg0:"#07071C", bg1:"#0D0D28", bg2:"#13133A", bg3:"#1A1A4A",
-  brd:"#252565", brdDim:"#1A1A48",
-  gold:"#F5A623", goldL:"#FFD080",
-  purp:"#8B5CF6", purpL:"#C4A5FF",
-  teal:"#06D6A0",
-  rose:"#F43F5E", sky:"#38BDF8",
-  text:"#EEEEFF", sub:"#8888BB", dim:"#3A3A6A",
-};
+import { T } from "./theme.js";
 
 const TABS = [
   { key:"day",      label:"Сегодня" },
