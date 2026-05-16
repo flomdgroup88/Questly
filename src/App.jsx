@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Component } from "react";
 import { cloudSave } from "./firebase.js";
 import OverviewScreen from "./OverviewScreen.jsx";
 import { T } from "./theme.js";
@@ -19,6 +19,193 @@ import { useTasks } from "./hooks/useTasks.js";
 import { useCloudSync } from "./hooks/useCloudSync.js";
 import { useMidnightRollover } from "./hooks/useMidnightRollover.js";
 
+// ─── ERROR BOUNDARY ───────────────────────────────────────────────
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(err, info) {
+    console.error("⚠️ Questly ErrorBoundary:", err, info?.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          flex: 1, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", gap: 16, padding: 32,
+          textAlign: "center",
+        }}>
+          <div style={{ fontSize: 52 }}>⚠️</div>
+          <div style={{ fontSize: 17, fontWeight: 800, color: T.rose }}>
+            Что-то пошло не так
+          </div>
+          <div style={{ fontSize: 13, color: T.sub, maxWidth: 260 }}>
+            {this.state.error?.message ?? "Неизвестная ошибка"}
+          </div>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{
+              marginTop: 8, padding: "10px 28px", borderRadius: 14,
+              border: "none", background: T.purp, color: "#fff",
+              fontSize: 14, fontWeight: 700, cursor: "pointer",
+            }}
+          >
+            Попробовать снова
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── ONBOARDING ───────────────────────────────────────────────────
+const ONBOARDING_STEPS = [
+  {
+    emoji: "⚔️",
+    title: "Добро пожаловать в Questly!",
+    text: "Это RPG-трекер задач: выполняй квесты, зарабатывай опыт и прокачивай своего героя.",
+  },
+  {
+    emoji: "⚡",
+    title: "XP и уровни",
+    text: "За каждую выполненную задачу ты получаешь XP. Набирай очки — и твой герой растёт в уровнях.",
+  },
+  {
+    emoji: "🤝",
+    title: "Союзники рядом",
+    text: "В разделе «Союзники» можно соревноваться с друзьями или вести общие списки дел. Начнём?",
+  },
+];
+
+function OnboardingModal({ onDone }) {
+  const [step, setStep] = useState(0);
+  const s = ONBOARDING_STEPS[step];
+  const isLast = step === ONBOARDING_STEPS.length - 1;
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 600,
+      background: "rgba(7,7,28,0.92)", backdropFilter: "blur(6px)",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", padding: 32,
+    }}>
+      <div style={{
+        background: T.bg1, borderRadius: 24, padding: "36px 28px 28px",
+        width: "100%", maxWidth: 340, textAlign: "center",
+        border: `1px solid ${T.brd}`, boxShadow: `0 0 60px ${T.purp}44`,
+      }}>
+        {/* Steps dots */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 28 }}>
+          {ONBOARDING_STEPS.map((_, i) => (
+            <div key={i} style={{
+              width: i === step ? 20 : 8, height: 8, borderRadius: 4,
+              background: i === step ? T.purp : T.brd,
+              transition: "all 0.3s ease",
+            }} />
+          ))}
+        </div>
+        <div style={{ fontSize: 56, marginBottom: 16 }}>{s.emoji}</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: T.text, marginBottom: 10, lineHeight: 1.3 }}>
+          {s.title}
+        </div>
+        <div style={{ fontSize: 14, color: T.sub, lineHeight: 1.6, marginBottom: 32 }}>
+          {s.text}
+        </div>
+        <button
+          onClick={() => isLast ? onDone() : setStep(s => s + 1)}
+          style={{
+            width: "100%", padding: "14px 0", borderRadius: 16,
+            border: "none", background: T.purp, color: "#fff",
+            fontSize: 15, fontWeight: 800, cursor: "pointer",
+            boxShadow: `0 4px 20px ${T.purp}66`,
+          }}
+        >
+          {isLast ? "Начать приключение! ⚡" : "Далее →"}
+        </button>
+        {!isLast && (
+          <button
+            onClick={onDone}
+            style={{
+              marginTop: 12, background: "none", border: "none",
+              color: T.dim, fontSize: 13, cursor: "pointer",
+            }}
+          >
+            Пропустить
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── NICKNAME GATE ────────────────────────────────────────────────
+function NicknameGateModal({ onSave, onClose }) {
+  const [name, setName] = useState("");
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 500,
+      background: "rgba(7,7,28,0.88)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+    }}>
+      <div style={{
+        background: T.bg1, borderRadius: 20, padding: "28px 24px",
+        width: "100%", maxWidth: 320, border: `1px solid ${T.brd}`,
+        boxShadow: `0 0 40px ${T.purp}33`,
+      }}>
+        <div style={{ fontSize: 40, textAlign: "center", marginBottom: 12 }}>🧙</div>
+        <div style={{ fontSize: 17, fontWeight: 800, color: T.purpL, textAlign: "center", marginBottom: 6 }}>
+          Как тебя зовут?
+        </div>
+        <div style={{ fontSize: 13, color: T.sub, textAlign: "center", marginBottom: 20 }}>
+          Имя будет видно друзьям в соревнованиях
+        </div>
+        <input
+          autoFocus
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && name.trim() && onSave(name.trim())}
+          placeholder="Твоё имя или никнейм…"
+          style={{
+            width: "100%", padding: "11px 14px", borderRadius: 12,
+            background: T.bg0, border: `1px solid ${T.brd}`,
+            color: T.text, fontSize: 15, outline: "none",
+            marginBottom: 16, boxSizing: "border-box",
+          }}
+        />
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: "11px 0", borderRadius: 12,
+              background: T.bg0, border: `1px solid ${T.brd}`,
+              color: T.sub, fontSize: 14, cursor: "pointer",
+            }}
+          >
+            Позже
+          </button>
+          <button
+            onClick={() => name.trim() && onSave(name.trim())}
+            disabled={!name.trim()}
+            style={{
+              flex: 2, padding: "11px 0", borderRadius: 12,
+              background: name.trim() ? T.purp : T.bg0,
+              border: "none", color: name.trim() ? "#fff" : T.dim,
+              fontSize: 14, fontWeight: 700, cursor: name.trim() ? "pointer" : "default",
+              transition: "all 0.2s",
+            }}
+          >
+            Сохранить ✓
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── TELEGRAM WEBAPP INIT ─────────────────────────────────────────
 const tg = typeof window !== "undefined" && window.Telegram?.WebApp;
 if (tg) {
@@ -33,6 +220,11 @@ export default function App() {
   // а не при каждой перерисовке компонента.
   const [saved]    = useState(() => loadState());
   const [savedSoc] = useState(() => loadSocial());
+
+  // Показываем онбординг только новым пользователям (нет сохранённых данных).
+  const [showOnboarding,   setShowOnboarding]   = useState(() => !loadState());
+  // Показываем окно никнейма перед входом в «Союзники», если имя не задано.
+  const [showNicknameGate, setShowNicknameGate] = useState(false);
 
   // ── Задачи и XP — через хук ───────────────────────────────────────
   const {
@@ -165,6 +357,15 @@ export default function App() {
     });
   }, []);
 
+  // ── Смена вкладки с проверкой никнейма ───────────────────────────
+  const handleTabChange = useCallback((id) => {
+    if (id === "social" && !nickname) {
+      setShowNicknameGate(true);
+    } else {
+      setTab(id);
+    }
+  }, [nickname]);
+
   // ─────────────────────────────────────────────────────────────────
   const level = lvlOf(xp);
 
@@ -196,6 +397,26 @@ export default function App() {
         @keyframes sparkle{0%{transform:rotate(0deg) scale(1)}50%{transform:rotate(180deg) scale(1.1)}100%{transform:rotate(360deg) scale(1)}}
         @keyframes toastSlide{0%{opacity:0;transform:translateX(-50%) translateY(20px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}85%{opacity:1;transform:translateX(-50%) translateY(0)}100%{opacity:0;transform:translateX(-50%) translateY(10px)}}
       `}</style>
+
+      {/* Онбординг для новых пользователей */}
+      {showOnboarding && (
+        <OnboardingModal onDone={() => setShowOnboarding(false)} />
+      )}
+
+      {/* Гейт никнейма перед «Союзниками» */}
+      {showNicknameGate && (
+        <NicknameGateModal
+          onSave={(name) => {
+            setNickname(name);
+            setShowNicknameGate(false);
+            setTab("social");
+          }}
+          onClose={() => {
+            setShowNicknameGate(false);
+            setTab("social");
+          }}
+        />
+      )}
 
       {/* ── Экран загрузки ── показываем пока Firebase не ответил ─── */}
       {isLoading && (
@@ -306,11 +527,13 @@ export default function App() {
 
       {/* Основной контент */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
-        {tab === "overview"  && <OverviewScreen tasks={tasks} xp={xp} level={level} rank={RANKS[Math.min(level - 1, RANKS.length - 1)]} rankIcon={RANK_ICONS[Math.min(level - 1, RANK_ICONS.length - 1)]} xpProgress={progOf(xp)} onEditTask={setOverviewEditTask} />}
-        {tab === "tasks"     && <TasksScreen tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} />}
-        {tab === "calendar"  && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
-        {tab === "social"    && <SocialScreen nickname={nickname} challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} />}
-        {tab === "profile"   && <ProfileScreen xp={xp} tasks={tasks} events={events} nickname={nickname} onSetNickname={setNickname} syncStatus={syncStatus} onImport={handleImport} />}
+        <ErrorBoundary key={tab}>
+          {tab === "overview"  && <OverviewScreen tasks={tasks} xp={xp} level={level} rank={RANKS[Math.min(level - 1, RANKS.length - 1)]} rankIcon={RANK_ICONS[Math.min(level - 1, RANK_ICONS.length - 1)]} xpProgress={progOf(xp)} onEditTask={setOverviewEditTask} />}
+          {tab === "tasks"     && <TasksScreen tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} />}
+          {tab === "calendar"  && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
+          {tab === "social"    && <SocialScreen nickname={nickname} challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} />}
+          {tab === "profile"   && <ProfileScreen xp={xp} tasks={tasks} events={events} nickname={nickname} onSetNickname={setNickname} syncStatus={syncStatus} onImport={handleImport} />}
+        </ErrorBoundary>
       </div>
 
       {/* Нижняя навигация */}
@@ -318,7 +541,7 @@ export default function App() {
         {TABS.map((t) => (
           <div
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => handleTabChange(t.id)}
             style={{ flex: 1, padding: "10px 0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}
           >
             <div style={{ fontSize: 22, transform: tab === t.id ? "scale(1.15)" : "scale(1)", transition: "transform 0.2s cubic-bezier(.34,1.56,.64,1)" }}>

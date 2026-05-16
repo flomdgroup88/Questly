@@ -294,6 +294,9 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
   const [showJoin,setJoin]=useState(false);
   const [detailCh,setDetailCh]=useState(null);
   const [detailSg,setDetailSg]=useState(null);
+  // Всегда берём свежую версию из sharedGoals (а не снимок на момент клика),
+  // чтобы отметка пункта сразу отражалась без закрытия/переоткрытия окна.
+  const currentDetailSg = detailSg ? sharedGoals.find(s => s.id === detailSg.id) ?? detailSg : null;
   const [shareItem,setShare]=useState(null);
 
   const tgUserSocial=typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -433,7 +436,7 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
       {showJoin&&<JoinModal challenges={challenges} sharedGoals={sharedGoals} onClose={()=>setJoin(false)} onJoinCh={joinCh} onJoinSg={joinSg} nickname={nickname}/>}
       {shareItem&&<ShareSheet code={shareItem.code} title={shareItem.title} onClose={()=>setShare(null)}/>}
       {detailCh&&<ChallengeDetail ch={detailCh} onClose={()=>setDetailCh(null)} nickname={nickname} onComplete={completeCh} onShare={()=>{setShare({code:detailCh.shareCode,title:detailCh.title});setDetailCh(null);}} onDelete={id=>{onDeleteCh(id);setDetailCh(null);}}/>}
-      {detailSg&&<SharedGoalDetail sg={detailSg} onClose={()=>setDetailSg(null)} nickname={nickname} onToggleItem={toggleSgItem} onAssign={assignSgItem} onShare={()=>{setShare({code:detailSg.shareCode,title:detailSg.title});setDetailSg(null);}} onDelete={id=>{onDeleteSg(id);setDetailSg(null);}}/>}
+      {currentDetailSg&&<SharedGoalDetail sg={currentDetailSg} onClose={()=>setDetailSg(null)} nickname={nickname} onToggleItem={toggleSgItem} onAssign={assignSgItem} onShare={()=>{setShare({code:currentDetailSg.shareCode,title:currentDetailSg.title});setDetailSg(null);}} onDelete={id=>{onDeleteSg(id);setDetailSg(null);}}/>}
     </div>
   );
 }
