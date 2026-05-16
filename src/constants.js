@@ -1,4 +1,5 @@
 import { T } from "./theme.js";
+import { bdName } from "./utils.js";
 
 // ─── GAME CONFIG ──────────────────────────────────────────────────
 export const PERIODS = [
@@ -135,9 +136,4 @@ export const CHECKLIST_PRESETS = [
 export const LS     = "questly_v2";
 export const LS_SOC = "questly_social_v1";
 
-// ─── INTERNAL HELPERS (needed by EVENT_TYPES.makeTasks) ──────────
-function bdName(t) {
-  const m = t.match(/(?:др|день рождения|днюха|birthday)[:\s]+(.+)/i)
-         || t.match(/(.+?)[\s,–-]+(?:др|день рождения|днюха)/i);
-  return m ? m[1].trim() : t.trim();
-}
+
