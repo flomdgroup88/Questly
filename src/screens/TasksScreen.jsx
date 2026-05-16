@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { T } from "../theme.js";
 import { today, tomorrowStr, isInCurrentWeek, isInCurrentMonth, isInCurrentYear } from "../utils.js";
 import { XPBar } from "../components/ui.jsx";
@@ -18,23 +18,28 @@ export default function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopT
   const [showCreate,setCreate]=useState(false);
   const [editTask,setEdit]=useState(null);
 
-  const tmrw=tomorrowStr();
+  const tmrw = tomorrowStr();
 
-  const filtered=tasks.filter(t=>{
-    if(filter==="tomorrow") return t.period==="day"&&t.dueDate===tmrw;
-    if(t.period!==filter) return false;
-    if(!t.dueDate) return filter==="day";
-    if(filter==="day")   return t.dueDate===today;
-    if(filter==="week")  return isInCurrentWeek(t.dueDate);
-    if(filter==="month") return isInCurrentMonth(t.dueDate);
-    if(filter==="year")  return isInCurrentYear(t.dueDate);
+  // useMemo: пересчитываем список только когда реально изменился массив задач
+  // или выбранный фильтр — не при каждом рендере родителя.
+  const filtered = useMemo(() => tasks.filter((t) => {
+    if (filter === "tomorrow") return t.period === "day" && t.dueDate === tmrw;
+    if (t.period !== filter) return false;
+    if (!t.dueDate) return filter === "day";
+    if (filter === "day")   return t.dueDate === today;
+    if (filter === "week")  return isInCurrentWeek(t.dueDate);
+    if (filter === "month") return isInCurrentMonth(t.dueDate);
+    if (filter === "year")  return isInCurrentYear(t.dueDate);
     return true;
-  });
-  const done=filtered.filter(t=>t.done).length;
-  const total=filtered.length;
-  const pct=total>0?done/total:0;
-  const ft=FILTER_TABS.find(x=>x.id===filter);
-  const p=filter==="tomorrow"?{accent:T.sky,desc:"на завтра",xp:15}:{accent:ft.accent,desc:filter==="day"?"на сегодня":filter==="week"?"на неделю":filter==="month"?"на месяц":"на год",xp:0};
+  }), [tasks, filter, tmrw]);
+
+  const done  = useMemo(() => filtered.filter((t) => t.done).length, [filtered]);
+  const total = filtered.length;
+  const pct   = total > 0 ? done / total : 0;
+  const ft    = FILTER_TABS.find((x) => x.id === filter);
+  const p     = filter === "tomorrow"
+    ? { accent: T.sky, desc: "на завтра", xp: 15 }
+    : { accent: ft.accent, desc: filter === "day" ? "на сегодня" : filter === "week" ? "на неделю" : filter === "month" ? "на месяц" : "на год", xp: 0 };
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>

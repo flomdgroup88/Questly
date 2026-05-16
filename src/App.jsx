@@ -59,13 +59,12 @@ export default function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Сохранение в localStorage при каждом изменении ───────────────
+  // Один эффект на все данные — не разбиваем на несколько,
+  // чтобы не делать две записи в хранилище за один цикл рендера.
   useEffect(() => {
     saveState({ xp, tasks, events, nickname, _savedAt: Date.now() });
-  }, [xp, tasks, events, nickname]);
-
-  useEffect(() => {
     saveSocial({ challenges, sharedGoals });
-  }, [challenges, sharedGoals]);
+  }, [xp, tasks, events, nickname, challenges, sharedGoals]);
 
   // ── Облачный синк — через хук ─────────────────────────────────────
   const { syncStatus, syncIcon } = useCloudSync({
