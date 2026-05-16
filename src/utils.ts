@@ -27,7 +27,7 @@ export const endOfWeek  = (): string => { const d = localNow(); const dow = d.ge
 export const endOfMonth = (): string => { const d = localNow(); d.setUTCMonth(d.getUTCMonth() + 1, 0); return fmtLocal(d); };
 export const endOfYear  = (): string => `${localNow().getUTCFullYear()}-12-31`;
 export const defaultDueForPeriod = (p: string): string =>
-  p === "week" ? endOfWeek() : p === "month" ? endOfMonth() : p === "year" ? endOfYear() : todayStr();
+  p === "week" ? endOfWeek() : p === "month" ? endOfMonth() : p === "year" ? endOfYear() : p === "dream" ? "" : todayStr();
 
 export const isInCurrentWeek = (s: string): boolean => {
   const d   = new Date(s + "T12:00:00Z");
@@ -163,6 +163,7 @@ export const spawnRecurring = (tasks: Task[], events: QuestlyEvent[], day: strin
   tasks.filter(t => t.recurring && t.dueDate !== day).forEach(t => {
     const ok = t.recurType === "day"
       || (t.recurType === "week"  && new Date(t.dueDate).getDay() === new Date(day).getDay())
+      || (t.recurType === "month" && new Date(t.dueDate).getDate() === new Date(day).getDate())
       || (t.recurType === "year"  && t.dueDate.slice(5) === day.slice(5));
     // Используем templateId для дедупликации — надёжнее, чем сравнение по названию.
     const tplId = t.templateId || t.id;
@@ -177,6 +178,7 @@ export const spawnRecurring = (tasks: Task[], events: QuestlyEvent[], day: strin
           const diffDays = Math.round((new Date(day).getTime() - new Date(lastDone.dueDate).getTime()) / 86400000);
           const cont = (t.recurType === "day" && diffDays <= 1)
                     || (t.recurType === "week" && diffDays <= 7)
+                    || (t.recurType === "month" && diffDays <= 31)
                     || (t.recurType === "year" && diffDays <= 366);
           inheritedStreak = cont ? (lastDone.streak || 0) : 0;
         }

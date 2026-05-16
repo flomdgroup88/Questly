@@ -6,11 +6,12 @@ import TaskCard from "../components/TaskCard.jsx";
 import TaskModal from "./TaskModal.jsx";
 
 const FILTER_TABS = [
-  { id:"day",      label:"Сегодня", icon:"⚡", accent:T.teal  },
-  { id:"tomorrow", label:"Завтра",  icon:"🌅", accent:T.sky   },
-  { id:"week",     label:"Неделя",  icon:"🌊", accent:T.sky   },
-  { id:"month",    label:"Месяц",   icon:"💫", accent:T.purpL },
-  { id:"year",     label:"Год",     icon:"👑", accent:T.gold  },
+  { id:"day",      label:"Сегодня", icon:"⚡", accent:T.teal     },
+  { id:"tomorrow", label:"Завтра",  icon:"🌅", accent:T.sky      },
+  { id:"week",     label:"Неделя",  icon:"🌊", accent:T.sky      },
+  { id:"month",    label:"Месяц",   icon:"💫", accent:T.purpL    },
+  { id:"year",     label:"Год",     icon:"👑", accent:T.gold     },
+  { id:"dream",    label:"Мечта",   icon:"🌠", accent:"#FF6B9D"  },
 ];
 
 export default function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopToggle }) {
@@ -30,6 +31,7 @@ export default function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopT
     if (filter === "week")  return isInCurrentWeek(t.dueDate);
     if (filter === "month") return isInCurrentMonth(t.dueDate);
     if (filter === "year")  return isInCurrentYear(t.dueDate);
+    if (filter === "dream") return true;
     return true;
   }), [tasks, filter, tmrw]);
 
@@ -39,7 +41,7 @@ export default function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopT
   const ft    = FILTER_TABS.find((x) => x.id === filter);
   const p     = filter === "tomorrow"
     ? { accent: T.sky, desc: "на завтра", xp: 15 }
-    : { accent: ft.accent, desc: filter === "day" ? "на сегодня" : filter === "week" ? "на неделю" : filter === "month" ? "на месяц" : "на год", xp: 0 };
+    : { accent: ft.accent, desc: filter === "day" ? "на сегодня" : filter === "week" ? "на неделю" : filter === "month" ? "на месяц" : filter === "year" ? "на год" : "мечта", xp: 0 };
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>

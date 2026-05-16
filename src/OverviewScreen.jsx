@@ -6,6 +6,7 @@ const TABS = [
   { key:"tomorrow", label:"Завтра"  },
   { key:"week",     label:"Неделя"  },
   { key:"month",    label:"Месяц"   },
+  { key:"dream",    label:"🌠 Мечта" },
 ];
 
 const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -293,15 +294,17 @@ export default function OverviewScreen({
     tomorrow: tasks.filter(t => !t.done && t.period==="day"   && t.dueDate===tomorrow),
     week:     tasks.filter(t => !t.done && t.period==="week"  && isInCurrentWeek(t.dueDate||today)),
     month:    tasks.filter(t => !t.done && t.period==="month" && isInCurrentMonth(t.dueDate||today)),
+    dream:    tasks.filter(t => !t.done && t.period==="dream"),
   };
 
-  const ACCENT = { day:T.teal, tomorrow:T.sky, week:T.sky, month:T.purpL };
+  const ACCENT = { day:T.teal, tomorrow:T.sky, week:T.sky, month:T.purpL, dream:"#FF6B9D" };
   const accent = ACCENT[activeTab];
 
   const sectionLabel = (() => {
     if (activeTab === "day")      return `ДЕЛА ${now.getDate()} ${MONTHS_GEN[now.getMonth()]}`;
     if (activeTab === "tomorrow") { const t = new Date(); t.setDate(t.getDate()+1); return `ДЕЛА ${t.getDate()} ${MONTHS_GEN[t.getMonth()]}`; }
     if (activeTab === "week")     return "ДЕЛА НА НЕДЕЛЮ";
+    if (activeTab === "dream") return "МЕЧТЫ";
     return "ДЕЛА НА МЕСЯЦ";
   })();
 

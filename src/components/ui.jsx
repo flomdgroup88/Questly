@@ -120,7 +120,7 @@ export function StyledInput({ value, onChange, placeholder, type="text", autoFoc
 export function RecurPicker({ value, onChange, accentC=T.purp, accentL=T.purpL }) {
   return (
     <div style={{display:"flex",gap:8}}>
-      {[["day","Ежедневно"],["week","Еженедельно"],["year","Ежегодно"]].map(([rt,lbl])=>(
+      {[["day","Ежедневно"],["week","Еженедельно"],["month","Ежемесячно"],["year","Ежегодно"]].map(([rt,lbl])=>(
         <div key={rt} onClick={()=>onChange(rt)} style={{
           flex:1,padding:"8px 4px",borderRadius:9,cursor:"pointer",
           textAlign:"center",fontSize:12,fontWeight:600,

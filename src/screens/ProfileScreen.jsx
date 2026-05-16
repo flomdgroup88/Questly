@@ -25,40 +25,69 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
   const allPeriodsCovered=["day","week","month","year"].every(p=>tasks.some(t=>t.period===p));
 
   const ACHIEVEMENTS=[
-    {icon:"⚡",label:"Первый шаг",       desc:"Выполни 1 задачу",          done:completed>=1,  cat:"tasks"},
-    {icon:"🔥",label:"На волне",         desc:"Выполни 5 задач",            done:completed>=5,  cat:"tasks"},
-    {icon:"💪",label:"В ритме",          desc:"Выполни 25 задач",           done:completed>=25, cat:"tasks"},
-    {icon:"🏆",label:"Сотня",            desc:"Выполни 100 задач",          done:completed>=100,cat:"tasks"},
-    {icon:"🌟",label:"Мастер квестов",   desc:"Выполни 500 задач",          done:completed>=500,cat:"tasks"},
-    {icon:"💎",label:"Целеустремлён",    desc:"Создай 10 задач",            done:total>=10,     cat:"tasks"},
-    {icon:"📦",label:"Архив квестов",    desc:"Создай 50 задач",            done:total>=50,     cat:"tasks"},
-    {icon:"👑",label:"Годовой план",     desc:"Добавь годовую цель",        done:tasks.some(t=>t.period==="year"),  cat:"period"},
-    {icon:"🌊",label:"Неделя",          desc:"Добавь еженедельную цель",   done:tasks.some(t=>t.period==="week"),  cat:"period"},
-    {icon:"💫",label:"Месяц",           desc:"Добавь ежемесячную цель",    done:tasks.some(t=>t.period==="month"), cat:"period"},
-    {icon:"🗓️",label:"Всё охвачено",   desc:"Добавь цели на все периоды", done:allPeriodsCovered,                 cat:"period"},
-    {icon:"🔥",label:"Серийщик",        desc:"Серия 7 дней подряд",        done:bestStreak>=7,   cat:"streak"},
-    {icon:"💪",label:"Стойкий",         desc:"Серия 30 дней подряд",       done:bestStreak>=30,  cat:"streak"},
-    {icon:"🔮",label:"Легенда серии",   desc:"Серия 100 дней подряд",      done:bestStreak>=100, cat:"streak"},
-    {icon:"♾️",label:"Вечный огонь",   desc:"Серия 365 дней подряд",      done:bestStreak>=365, cat:"streak"},
-    {icon:"⭐",label:"Посвящённый",     desc:"Достигни 5 уровня",          done:level>=5,  cat:"level"},
-    {icon:"🌟",label:"Искушённый",      desc:"Достигни 10 уровня",         done:level>=10, cat:"level"},
-    {icon:"💫",label:"Избранный",       desc:"Достигни 20 уровня",         done:level>=20, cat:"level"},
-    {icon:"🔮",label:"Архимаг",         desc:"Достигни 40 уровня",         done:level>=40, cat:"level"},
-    {icon:"👑",label:"Легенда",         desc:"Достигни 60 уровня",         done:level>=60, cat:"level"},
-    {icon:"⚡",label:"Запредельный",    desc:"Достигни 80 уровня",         done:level>=80, cat:"level"},
-    {icon:"🔄",label:"Привычка",        desc:"Создай повторяемую задачу",  done:tasks.some(t=>t.recurring), cat:"habit"},
-    {icon:"📋",label:"Оптовик",         desc:"Используй режим «Список»",   done:tasks.filter(t=>!t.recurring).length>=5&&total>=5, cat:"habit"},
-    {icon:"🛒",label:"Шопоголик",       desc:"Создай список покупок",      done:hasShopTask,     cat:"habit"},
-    {icon:"🧺",label:"Закупился",       desc:"Отметь 10 покупок",          done:shopItemsDone>=10,cat:"habit"},
-    {icon:"🎂",label:"Не забуду",       desc:"Добавь день рождения",       done:events.some(e=>e.isBirthday),  cat:"events"},
-    {icon:"📅",label:"Организатор",     desc:"Добавь 5 событий",           done:events.length>=5,               cat:"events"},
-    {icon:"🗺️",label:"Путешественник", desc:"Добавь событие «Поездка»",   done:events.some(e=>e.eventType==="trip"), cat:"events"},
-    {icon:"⏰",label:"Дедлайнер",       desc:"Добавь событие «Дедлайн»",   done:events.some(e=>e.eventType==="deadline"), cat:"events"},
-    {icon:"🎉",label:"Праздник!",       desc:"Добавь событие «Праздник»",  done:events.some(e=>e.eventType==="holiday"), cat:"events"},
-    {icon:"📅",label:"Хронист",         desc:"Добавь 20 событий",          done:events.length>=20, cat:"events"},
+    // ── Задачи ──────────────────────────────────────────
+    {icon:"⚡",label:"Первый шаг",        desc:"Выполни первую задачу",          done:completed>=1,   cat:"tasks"},
+    {icon:"🔥",label:"Пятёрка",           desc:"Выполни 5 задач",                done:completed>=5,   cat:"tasks"},
+    {icon:"💪",label:"В ритме",           desc:"Выполни 25 задач",               done:completed>=25,  cat:"tasks"},
+    {icon:"💯",label:"Сотня",             desc:"Выполни 100 задач",              done:completed>=100, cat:"tasks"},
+    {icon:"🚀",label:"500 и не устал",    desc:"Выполни 500 задач",              done:completed>=500, cat:"tasks"},
+    {icon:"🌍",label:"Тысячник",          desc:"Выполни 1000 задач",             done:completed>=1000,cat:"tasks"},
+    {icon:"📦",label:"Коллекционер",      desc:"Создай 10 задач",                done:total>=10,      cat:"tasks"},
+    {icon:"🗄️",label:"Библиотека задач",  desc:"Создай 50 задач",                done:total>=50,      cat:"tasks"},
+    // ── Периоды ─────────────────────────────────────────
+    {icon:"👑",label:"Годовой план",      desc:"Добавь цель на год",             done:tasks.some(t=>t.period==="year"),  cat:"period"},
+    {icon:"🌊",label:"Недельный игрок",   desc:"Добавь еженедельную цель",       done:tasks.some(t=>t.period==="week"),  cat:"period"},
+    {icon:"💫",label:"Месяц вперёд",      desc:"Добавь ежемесячную цель",        done:tasks.some(t=>t.period==="month"), cat:"period"},
+    {icon:"🌠",label:"Мечтатель",         desc:"Добавь мечту",                   done:tasks.some(t=>t.period==="dream"), cat:"period"},
+    {icon:"🗓️",label:"Всё охвачено",      desc:"Цели на все периоды сразу",      done:["day","week","month","year","dream"].every(p=>tasks.some(t=>t.period===p)), cat:"period"},
+    // ── Серии ───────────────────────────────────────────
+    {icon:"🔥",label:"Неделя без пропуска",desc:"Серия 7 дней подряд",           done:bestStreak>=7,   cat:"streak"},
+    {icon:"💪",label:"Железная воля",     desc:"Серия 30 дней подряд",           done:bestStreak>=30,  cat:"streak"},
+    {icon:"🏃",label:"Марафонец",         desc:"Серия 100 дней подряд",          done:bestStreak>=100, cat:"streak"},
+    {icon:"♾️",label:"Вечный огонь",      desc:"Серия 365 дней подряд",          done:bestStreak>=365, cat:"streak"},
+    // ── Уровни ──────────────────────────────────────────
+    {icon:"⭐",label:"Нашёл себя",         desc:"Достигни уровня 5",              done:level>=5,  cat:"level"},
+    {icon:"🌟",label:"Уже не новичок",     desc:"Достигни уровня 10",             done:level>=10, cat:"level"},
+    {icon:"💫",label:"Серьёзный человек",  desc:"Достигни уровня 20",             done:level>=20, cat:"level"},
+    {icon:"🔮",label:"Икона квартала",     desc:"Достигни уровня 40",             done:level>=40, cat:"level"},
+    {icon:"👑",label:"Легенда приложения", desc:"Достигни уровня 60",             done:level>=60, cat:"level"},
+    {icon:"🫵",label:"ТЫ",                desc:"Достигни уровня 80",             done:level>=80, cat:"level"},
+    // ── Привычки ────────────────────────────────────────
+    {icon:"🔄",label:"Завёл привычку",    desc:"Создай повторяемую задачу",      done:tasks.some(t=>t.recurring), cat:"habit"},
+    {icon:"🛒",label:"Шопоголик",         desc:"Создай список покупок",          done:hasShopTask,      cat:"habit"},
+    {icon:"🧺",label:"Закупился",         desc:"Отметь 10 покупок",              done:shopItemsDone>=10,cat:"habit"},
+    {icon:"📋",label:"Список на неделю",  desc:"Сделай чеклист для недельной задачи", done:tasks.some(t=>t.period==="week"&&t.shopItems?.length>0), cat:"habit"},
+    {icon:"🗓️",label:"Чеклист мечты",    desc:"Сделай чеклист для мечты",        done:tasks.some(t=>t.period==="dream"&&t.shopItems?.length>0), cat:"habit"},
+    // ── События ─────────────────────────────────────────
+    {icon:"🎂",label:"Не забуду",         desc:"Добавь день рождения",           done:events.some(e=>e.isBirthday),   cat:"events"},
+    {icon:"📅",label:"Организатор",       desc:"Добавь 5 событий",               done:events.length>=5,               cat:"events"},
+    {icon:"🗺️",label:"Путешественник",    desc:"Добавь поездку",                 done:events.some(e=>e.eventType==="trip"), cat:"events"},
+    {icon:"⏰",label:"Мастер дедлайнов",  desc:"Добавь дедлайн",                 done:events.some(e=>e.eventType==="deadline"), cat:"events"},
+    {icon:"🎉",label:"Праздник!",         desc:"Добавь праздник",                done:events.some(e=>e.eventType==="holiday"), cat:"events"},
+    {icon:"📅",label:"Хронист",           desc:"Добавь 20 событий",              done:events.length>=20, cat:"events"},
+    // ── Бонусные ────────────────────────────────────────
+    {icon:"🌅",label:"Ранняя пташка",     desc:"Выполни задачу в первый день",   done:completed>=1, cat:"bonus"},
+    {icon:"🧠",label:"Стратег",           desc:"Цели на неделю, месяц и год одновременно", done:["week","month","year"].every(p=>tasks.some(t=>t.period===p)), cat:"bonus"},
+    {icon:"🎯",label:"Снайпер",           desc:"Выполни 10 задач подряд без пропуска", done:bestStreak>=10, cat:"bonus"},
+    {icon:"🌈",label:"Многозадачность",   desc:"Задачи во всех 5 периодах",      done:["day","week","month","year","dream"].every(p=>tasks.some(t=>t.period===p)), cat:"bonus"},
+    {icon:"💬",label:"Социальный",        desc:"Участвуй в соревновании",        done:false, cat:"bonus"},
+    {icon:"🤝",label:"Командный игрок",   desc:"Добавь встречу",                 done:events.some(e=>e.eventType==="meeting"), cat:"events"},
+    {icon:"🏥",label:"ЗОЖ",              desc:"Добавь событие здоровья",         done:events.some(e=>e.eventType==="health"), cat:"events"},
+    {icon:"📖",label:"Книжный червь",     desc:"Выполни 3 книжных задачи",       done:tasks.filter(t=>t.done&&t.title?.toLowerCase().includes("книг")).length>=1, cat:"bonus"},
+    {icon:"🏋️",label:"Спортсмен",        desc:"Выполни 5 спортивных задач",     done:tasks.filter(t=>t.done&&(t.title?.toLowerCase().includes("трен")||t.title?.toLowerCase().includes("спорт")||t.title?.toLowerCase().includes("зал"))).length>=5, cat:"bonus"},
+    {icon:"💰",label:"Финансист",         desc:"Создай финансовую задачу",       done:tasks.some(t=>t.title?.toLowerCase().includes("деньг")||t.title?.toLowerCase().includes("бюджет")||t.title?.toLowerCase().includes("инвест")), cat:"bonus"},
+    {icon:"✈️",label:"Вечно в пути",      desc:"Добавь 3 поездки",               done:events.filter(e=>e.eventType==="trip").length>=3, cat:"events"},
+    {icon:"🎓",label:"Самообразование",   desc:"Учись каждую неделю 4 недели",   done:bestStreak>=28, cat:"bonus"},
+    {icon:"🌙",label:"Ночной режим",      desc:"Выполни 50 задач",               done:completed>=50, cat:"tasks"},
+    {icon:"🦅",label:"Орёл",             desc:"Серия 14 дней",                  done:bestStreak>=14, cat:"streak"},
+    {icon:"🏆",label:"Чемпион",          desc:"Серия 60 дней",                  done:bestStreak>=60, cat:"streak"},
+    {icon:"💎",label:"Бриллиант",        desc:"Серия 200 дней",                 done:bestStreak>=200,cat:"streak"},
+    {icon:"🧬",label:"ДНК продуктивности",desc:"Серия 500 дней",                done:bestStreak>=500,cat:"streak"},
   ];
 
-  const doneCount=ACHIEVEMENTS.filter(a=>a.done).length;
+  const VISIBLE_ACHIEVEMENTS = 8;
+  const [showAllAchievements, setShowAllAchievements] = useState(false);
+  const doneCount=ACHIEVEMENTS.filter(a=>a.done).length;=ACHIEVEMENTS.filter(a=>a.done).length;
 
   const MILESTONE_LEVELS=[1,2,3,5,10,15,20,30,40,50,60,70,80];
   const tableRows=[...new Set([...MILESTONE_LEVELS,level,level+1,level+2])].filter(l=>l>=1&&l<=80).sort((a,b)=>a-b);
@@ -175,7 +204,7 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
         </div>
         <XPBar progress={doneCount/ACHIEVEMENTS.length} color={T.gold} height={4}/>
         <div style={{marginTop:14,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          {ACHIEVEMENTS.map(a=>(
+          {(showAllAchievements?ACHIEVEMENTS:ACHIEVEMENTS.slice(0,VISIBLE_ACHIEVEMENTS)).map(a=>(
             <div key={a.label} style={{background:a.done?T.gold+"22":T.bg0,border:`1px solid ${a.done?T.gold+"66":T.brd}`,borderRadius:11,padding:"12px",transition:"all 0.3s"}}>
               <div style={{fontSize:22,marginBottom:4,filter:a.done?"none":"grayscale(0.8) opacity(0.4)"}}>{a.icon}</div>
               <div style={{fontSize:12,fontWeight:700,color:a.done?T.gold:T.sub}}>{a.label}</div>
@@ -183,6 +212,9 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
               {!a.done&&<div style={{fontSize:9,color:T.dim,marginTop:4,fontWeight:600,letterSpacing:"0.04em"}}>🔒 не открыто</div>}
             </div>
           ))}
+          <div onClick={()=>setShowAllAchievements(v=>!v)} style={{gridColumn:"1/-1",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",borderRadius:11,cursor:"pointer",background:T.bg0,border:`1px solid ${T.brd}`,marginTop:2}}>
+            <span style={{fontSize:12,color:T.purpL,fontWeight:700}}>{showAllAchievements?`▲ Свернуть`:`▼ Показать все (${ACHIEVEMENTS.length})`}</span>
+          </div>
         </div>
       </div>
 
@@ -196,7 +228,7 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
           <>
             <div style={{fontSize:11,color:T.sub,marginBottom:10,lineHeight:1.5}}>Ранние уровни достигаются быстро. С каждым уровнем требования растут — уровень 80 потребует миллионы XP.</div>
             <div style={{display:"grid",gridTemplateColumns:"36px 1fr 80px 60px",gap:"0 8px",fontSize:11}}>
-              {["Ур.","Ранг","Нужно XP","Всего"].map(h=>(
+              {["Ур.","Звание","Нужно XP","Всего"].map(h=>(
                 <div key={h} style={{color:T.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",padding:"4px 0",borderBottom:`1px solid ${T.brd}`,marginBottom:4}}>{h}</div>
               ))}
               {tableRows.map(l=>{
@@ -206,7 +238,7 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
                 const total_=XP_TABLE[l-1]??0;
                 return [
                   <div key={`l${l}`} style={{color:isCurrent?T.gold:isReached?T.teal:T.sub,fontWeight:isCurrent?900:600,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,display:"flex",alignItems:"center",gap:3}}>{isCurrent?"▶":""}{l}</div>,
-                  <div key={`r${l}`} style={{color:isCurrent?T.gold:isReached?T.text:T.dim,fontWeight:isCurrent?800:400,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{RANK_ICONS[Math.min(l-1,79)]} {RANKS[Math.min(l-1,79)]}</div>,
+                  <div key={`r${l}`} style={{color:isCurrent?T.gold:isReached?T.text:T.dim,fontWeight:isCurrent?800:400,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{RANK_ICONS[Math.min(l-1,79)]} {isCurrent?RANKS[Math.min(l-1,79)]:"???"}</div>,
                   <div key={`n${l}`} style={{color:isCurrent?T.purpL:isReached?T.sub:T.dim,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,textAlign:"right"}}>{l===1?"—":"+"+fmtXP(needed)}</div>,
                   <div key={`t${l}`} style={{color:isCurrent?T.gold:isReached?T.teal:T.dim,fontWeight:isCurrent?800:400,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,textAlign:"right"}}>{l===1?"0":fmtXP(total_)}</div>,
                 ];

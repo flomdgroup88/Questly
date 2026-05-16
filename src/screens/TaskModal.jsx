@@ -43,7 +43,7 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
     onSave({
       id:existing?.id??uid(),title:title.trim(),period,done:existing?.done??false,
       xp:p.xp,dueDate,recurring,recurType,streakEnabled,streak:existing?.streak??0,
-      ...(hasChecklist&&period==="day"?{
+      ...(hasChecklist?{
         shopItems,
         checklistIcon:checkPresetId==="custom"?(customEmoji||"📋"):checklistIcon,
         checklistName:checkPresetId==="custom"?(customLabel||"Список"):checklistName,
@@ -93,7 +93,7 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
         </div>
       </div>
 
-      {period==="day"&&!bulkMode&&(
+      {!bulkMode&&(
         <div style={{marginBottom:14}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:T.bg0,padding:"11px 14px",borderRadius:11,border:`1px solid ${T.brd}`,marginBottom:hasChecklist?10:0,cursor:"pointer"}} onClick={()=>setHasChecklist(v=>!v)}>
             <div>
@@ -147,10 +147,12 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
         </div>
       )}
 
+      {period !== "dream" && (
       <div style={{marginBottom:14}}>
         <SectionLabel>Срок выполнения</SectionLabel>
         <StyledInput type="date" value={dueDate} onChange={e=>setDate(e.target.value)}/>
       </div>
+      )}
 
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:recurring?10:18,background:T.bg0,padding:"11px 14px",borderRadius:11,border:`1px solid ${T.brd}`}}>
         <span style={{fontSize:14,color:T.text}}>🔄 Повторяемая задача</span>
