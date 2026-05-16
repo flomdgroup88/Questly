@@ -4,7 +4,7 @@ import { PERIODS, RANKS, RANK_ICONS, XP_TABLE } from "../constants.js";
 import { lvlOf, progOf, nextXP } from "../utils.js";
 import { XPBar } from "../components/ui.jsx";
 
-export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickname }) {
+export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickname, syncStatus, onImport }) {
   const level=lvlOf(xp), rank=RANKS[Math.min(level-1,RANKS.length-1)];
   const rankIcon=RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)];
   const toNext=nextXP(xp), completed=tasks.filter(t=>t.done).length, total=tasks.length;
@@ -185,7 +185,87 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
           </>
         )}
       </div>
+      {/* ─── Экспорт / Импорт / Облако ─────────────────────── */}
+      <DataSafetyBlock
+        xp={xp} tasks={tasks} events={events} nickname={nickname}
+        syncStatus={syncStatus} onImport={onImport}
+      />
       <div style={{height:20}}/>
+    </div>
+  );
+}
+
+// ─── DATA SAFETY BLOCK ────────────────────────────────────────────
+function DataSafetyBlock({ xp, tasks, events, nickname, syncStatus, onImport }) {
+  const [importErr, setImportErr] = useState("");
+  const [importOk,  setImportOk]  = useState(false);
+
+  const handleExport = () => {
+    const data = { xp, tasks, events, nickname, _exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = `questly-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportErr(""); setImportOk(false);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.tasks || !Array.isArray(data.tasks)) throw new Error("bad format");
+        onImport(data);
+        setImportOk(true); setTimeout(() => setImportOk(false), 3000);
+      } catch { setImportErr("Ошибка: файл повреждён или неверного формата"); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const cloudLabel = syncStatus==="saving"?"⏳ Синхронизация…":syncStatus==="saved"?"☁️ Данные в облаке":syncStatus==="error"?"⚠️ Ошибка облака":"☁️ Облачный бэкап";
+  const cloudColor = syncStatus==="error"?T.rose:syncStatus==="saved"?T.teal:T.sub;
+
+  return (
+    <div style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:14,padding:"16px",marginBottom:16}}>
+      <div style={{fontSize:13,fontWeight:700,color:T.text,marginBottom:4}}>💾 Безопасность данных</div>
+      <div style={{fontSize:12,color:T.sub,marginBottom:14,lineHeight:1.5}}>Данные автоматически сохраняются в браузере и в облаке. Для дополнительной защиты — скачайте резервную копию.</div>
+
+      {/* Статус облака */}
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",background:T.bg0,borderRadius:11,border:`1px solid ${T.brd}`,marginBottom:10}}>
+        <div style={{flex:1}}>
+          <div style={{fontSize:13,fontWeight:700,color:cloudColor}}>{cloudLabel}</div>
+          <div style={{fontSize:11,color:T.dim,marginTop:2}}>{syncStatus==="error"?"Проверь подключение к сети":"Автоматически · каждые 4 сек после изменений"}</div>
+        </div>
+        <div style={{fontSize:20}}>{syncStatus==="saving"?"⏳":syncStatus==="saved"?"✓":syncStatus==="error"?"✗":"📡"}</div>
+      </div>
+
+      {/* Экспорт */}
+      <div onClick={handleExport} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:11,cursor:"pointer",background:`linear-gradient(135deg,${T.purp}22,${T.sky}11)`,border:`1px solid ${T.purp}44`,marginBottom:10}}>
+        <span style={{fontSize:22}}>📤</span>
+        <div style={{flex:1}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.purpL}}>Скачать резервную копию</div>
+          <div style={{fontSize:11,color:T.sub,marginTop:1}}>{tasks.length} задач · {events.length} событий · {xp} XP</div>
+        </div>
+        <span style={{fontSize:12,color:T.purpL,fontWeight:700}}>JSON</span>
+      </div>
+
+      {/* Импорт */}
+      <label style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:11,cursor:"pointer",background:T.bg0,border:`1px solid ${T.brd}`}}>
+        <input type="file" accept=".json" onChange={handleFileChange} style={{display:"none"}}/>
+        <span style={{fontSize:22}}>📥</span>
+        <div style={{flex:1}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.text}}>Восстановить из файла</div>
+          <div style={{fontSize:11,color:T.sub,marginTop:1}}>Выбери ранее скачанный .json</div>
+        </div>
+        <span style={{fontSize:12,color:T.teal,fontWeight:700,background:T.teal+"22",padding:"3px 8px",borderRadius:6}}>Выбрать</span>
+      </label>
+
+      {importOk  && <div style={{marginTop:8,fontSize:12,color:T.teal,fontWeight:700,textAlign:"center"}}>✓ Данные восстановлены!</div>}
+      {importErr && <div style={{marginTop:8,fontSize:12,color:T.rose,textAlign:"center"}}>{importErr}</div>}
     </div>
   );
 }

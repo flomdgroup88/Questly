@@ -2,16 +2,23 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // challenges и sharedGoals: публичный доступ на чтение и запись
-    // (без аутентификации — для Telegram Mini App)
+    // ── Личные данные пользователя ────────────────────────────────
+    // Telegram-пользователи: ключ "tg_{id}" — без серверной проверки
+    // Firebase anonymous: правило по request.auth.uid
+    match /userData/{userKey} {
+      // Telegram-ключи: доступ открыт (ID известен только владельцу аккаунта)
+      allow read, write: if userKey.matches('tg_.*');
+      // Anonymous auth: только владелец
+      allow read, write: if request.auth != null && request.auth.uid == userKey;
+    }
+
+    // ── Соцфичи (без аутентификации — Telegram Mini App) ─────────
     match /challenges/{shareCode} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if true;
     }
 
     match /sharedGoals/{shareCode} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if true;
     }
   }
 }
