@@ -46,11 +46,11 @@ export default function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopT
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
       <div style={{padding:"12px 16px 8px",flexShrink:0}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:3,background:T.bg2,borderRadius:14,padding:3,border:`1px solid ${T.brd}`}}>
+        <div style={{display:"flex",gap:3,background:T.bg2,borderRadius:14,padding:3,border:`1px solid ${T.brd}`,overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
           {FILTER_TABS.map(ft=>{
             const active=filter===ft.id;
             return (
-              <div key={ft.id} onClick={()=>setFilter(ft.id)} style={{borderRadius:10,cursor:"pointer",padding:"7px 2px",display:"flex",flexDirection:"column",alignItems:"center",gap:2,background:active?ft.accent:"transparent",boxShadow:active?`0 2px 8px ${ft.accent}55`:"none",transition:"all 0.2s cubic-bezier(.34,1.56,.64,1)"}}>
+              <div key={ft.id} onClick={()=>setFilter(ft.id)} style={{flex:1,minWidth:48,borderRadius:10,cursor:"pointer",padding:"7px 6px",display:"flex",flexDirection:"column",alignItems:"center",gap:2,background:active?ft.accent:"transparent",boxShadow:active?`0 2px 8px ${ft.accent}55`:"none",transition:"all 0.2s cubic-bezier(.34,1.56,.64,1)"}}>
                 <span style={{fontSize:13,lineHeight:1}}>{ft.icon}</span>
                 <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.01em",color:active?(ft.id==="month"?"#fff":"#000"):T.sub,transition:"color 0.2s"}}>{ft.label}</span>
               </div>

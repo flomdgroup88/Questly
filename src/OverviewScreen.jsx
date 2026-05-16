@@ -6,7 +6,7 @@ const TABS = [
   { key:"tomorrow", label:"Завтра"  },
   { key:"week",     label:"Неделя"  },
   { key:"month",    label:"Месяц"   },
-  { key:"dream",    label:"🌠 Мечта" },
+  { key:"dream",    label:"Мечта" },
 ];
 
 const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;

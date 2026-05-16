@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { T } from "../theme.js";
-import { PERIODS, RANKS, RANK_ICONS, XP_TABLE } from "../constants.js";
+import { PERIODS, RANKS, RANK_ICONS } from "../constants.js";
 import { lvlOf, progOf, nextXP } from "../utils.js";
 import { XPBar } from "../components/ui.jsx";
 
@@ -8,7 +8,6 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
   const level=lvlOf(xp), rank=RANKS[Math.min(level-1,RANKS.length-1)];
   const rankIcon=RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)];
   const toNext=nextXP(xp), completed=tasks.filter(t=>t.done).length, total=tasks.length;
-  const [showLevelTable,setShowLevelTable]=useState(false);
   const [editingNick,setEditingNick]=useState(false);
   const [nickDraft,setNickDraft]=useState(nickname||"");
   const [showAvatarPicker,setShowAvatarPicker]=useState(false);
@@ -89,9 +88,6 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
   const [showAllAchievements, setShowAllAchievements] = useState(false);
   const doneCount=ACHIEVEMENTS.filter(a=>a.done).length;
 
-  const MILESTONE_LEVELS=[1,2,3,5,10,15,20,30,40,50,60,70,80];
-  const tableRows=[...new Set([...MILESTONE_LEVELS,level,level+1,level+2])].filter(l=>l>=1&&l<=80).sort((a,b)=>a-b);
-  const fmtXP=n=>n>=1000000?(n/1000000).toFixed(1)+"M":n>=1000?(n/1000).toFixed(0)+"K":n;
 
   return (
     <div style={{flex:1,overflowY:"auto",padding:"14px 16px",WebkitOverflowScrolling:"touch"}}>
@@ -218,36 +214,7 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
         </div>
       </div>
 
-      {/* Level table */}
-      <div style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:14,padding:"16px",marginBottom:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,cursor:"pointer"}} onClick={()=>setShowLevelTable(v=>!v)}>
-          <div style={{fontSize:13,fontWeight:700,color:T.text}}>📈 Таблица уровней (80)</div>
-          <div style={{fontSize:11,color:T.purpL,fontWeight:700,background:T.purp+"22",border:`1px solid ${T.purp}44`,padding:"3px 10px",borderRadius:20}}>{showLevelTable?"▲ Свернуть":"▼ Показать"}</div>
-        </div>
-        {showLevelTable&&(
-          <>
-            <div style={{fontSize:11,color:T.sub,marginBottom:10,lineHeight:1.5}}>Ранние уровни достигаются быстро. С каждым уровнем требования растут — уровень 80 потребует миллионы XP.</div>
-            <div style={{display:"grid",gridTemplateColumns:"36px 1fr 80px 60px",gap:"0 8px",fontSize:11}}>
-              {["Ур.","Звание","Нужно XP","Всего"].map(h=>(
-                <div key={h} style={{color:T.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",padding:"4px 0",borderBottom:`1px solid ${T.brd}`,marginBottom:4}}>{h}</div>
-              ))}
-              {tableRows.map(l=>{
-                const isCurrent=l===level;
-                const isReached=xp>=(XP_TABLE[l-1]??0);
-                const needed=l===1?0:(XP_TABLE[l-1]??0)-(XP_TABLE[l-2]??0);
-                const total_=XP_TABLE[l-1]??0;
-                return [
-                  <div key={`l${l}`} style={{color:isCurrent?T.gold:isReached?T.teal:T.sub,fontWeight:isCurrent?900:600,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,display:"flex",alignItems:"center",gap:3}}>{isCurrent?"▶":""}{l}</div>,
-                  <div key={`r${l}`} style={{color:isCurrent?T.gold:isReached?T.text:T.dim,fontWeight:isCurrent?800:400,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{RANK_ICONS[Math.min(l-1,79)]} {isCurrent?RANKS[Math.min(l-1,79)]:"???"}</div>,
-                  <div key={`n${l}`} style={{color:isCurrent?T.purpL:isReached?T.sub:T.dim,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,textAlign:"right"}}>{l===1?"—":"+"+fmtXP(needed)}</div>,
-                  <div key={`t${l}`} style={{color:isCurrent?T.gold:isReached?T.teal:T.dim,fontWeight:isCurrent?800:400,padding:"5px 0",borderBottom:`1px solid ${T.brdDim}`,textAlign:"right"}}>{l===1?"0":fmtXP(total_)}</div>,
-                ];
-              })}
-            </div>
-            <div style={{marginTop:12,fontSize:11,color:T.dim,textAlign:"center"}}>Уровень 80 требует {(XP_TABLE[79]/1000000).toFixed(1)}M XP — ~{Math.round(XP_TABLE[79]/15).toLocaleString()} ежедневных задач</div>
-          </>
-        )}
-      </div>
+
       {/* ─── Уведомления ──────────────────────────────────── */}
       <NotificationsBlock
         enabled={notifEnabled}
