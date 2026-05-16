@@ -315,19 +315,23 @@ export default function App() {
   // ── Ключ пользователя для уведомлений (появляется после auth) ────
   const [notifUserKey, setNotifUserKey] = useState(null);
 
+  // useCallback гарантирует стабильную ссылку — useCloudSync не перезапускает
+  // подписку на onAuthStateChanged при каждом рендере App.
+  const handleCloudLoaded = useCallback(({ tasks: t, events: e, xp: x, nickname: n, userAvatar: av }) => {
+    if (t)          setTasks(t);
+    if (e)          setEvts(e);
+    if (x !== null) setXP(x);
+    if (n)          setNickname(n);
+    if (av)         setUserAvatar(av);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { syncStatus, syncIcon, isLoading, showOfflineToast } = useCloudSync({
     xp,
     tasks,
     events,
     nickname,
     savedLocalTime: saved?._savedAt ?? 0,
-    onCloudLoaded: ({ tasks: t, events: e, xp: x, nickname: n }) => {
-      if (t)          setTasks(t);
-      if (e)          setEvts(e);
-      if (x !== null) setXP(x);
-      if (n)          setNickname(n);
-      if (data?.userAvatar) setUserAvatar(data.userAvatar);
-    },
+    onCloudLoaded: handleCloudLoaded,
   });
 
   // ── Полуночный перенос задач (00:00 МСК) ─────────────────────────
