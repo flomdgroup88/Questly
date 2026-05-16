@@ -1,24 +1,66 @@
 import { XP_TABLE, RANKS, PERIODS, EVENT_TYPES, LS, LS_SOC } from "./constants.js";
 
+// ─── MOSCOW TIME HELPERS ──────────────────────────────────────────
+// Москва — UTC+3, летнего времени нет.
+// Все «сегодня», «неделя», «месяц» и т.д. считаются по МСК,
+// чтобы день менялся ровно в 00:00 по московскому времени.
+const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+// Возвращает Date, у которого UTC-поля совпадают с московскими полями.
+const mskNow = () => new Date(Date.now() + MSK_OFFSET_MS);
+
+// Форматирует Date (с MSK-полями) в строку "YYYY-MM-DD".
+const fmtMsk = d =>
+  `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+
 // ─── DATE HELPERS ─────────────────────────────────────────────────
-export const todayStr    = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
-export const tomorrowStr = () => { const d=new Date(); d.setDate(d.getDate()+1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+export const todayStr    = () => fmtMsk(mskNow());
+export const tomorrowStr = () => { const d=mskNow(); d.setUTCDate(d.getUTCDate()+1); return fmtMsk(d); };
 export const fmtDate     = s => { const [y,m,d]=s.split("-"); return `${d}.${m}.${y}`; };
 export const uid         = () => `q${Date.now().toString(36)}${Math.random().toString(36).slice(2,5)}`;
 
-export const endOfWeek  = () => { const d=new Date(); const dow=d.getDay(); const diff=dow===0?0:7-dow; d.setDate(d.getDate()+diff); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
-export const endOfMonth = () => { const d=new Date(); d.setMonth(d.getMonth()+1,0); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
-export const endOfYear  = () => { const d=new Date(); return `${d.getFullYear()}-12-31`; };
+export const endOfWeek  = () => { const d=mskNow(); const dow=d.getUTCDay(); const diff=dow===0?0:7-dow; d.setUTCDate(d.getUTCDate()+diff); return fmtMsk(d); };
+export const endOfMonth = () => { const d=mskNow(); d.setUTCMonth(d.getUTCMonth()+1,0); return fmtMsk(d); };
+export const endOfYear  = () => `${mskNow().getUTCFullYear()}-12-31`;
 export const defaultDueForPeriod = p => p==="week"?endOfWeek():p==="month"?endOfMonth():p==="year"?endOfYear():todayStr();
 
-export const isInCurrentWeek  = s => { const d=new Date(s+"T12:00:00"); const now=new Date(); const dow=now.getDay(); const mon=new Date(now); mon.setDate(now.getDate()-(dow===0?6:dow-1)); mon.setHours(0,0,0,0); const sun=new Date(mon); sun.setDate(mon.getDate()+6); sun.setHours(23,59,59,999); return d>=mon&&d<=sun; };
-export const isInCurrentMonth = s => { const d=new Date(s+"T12:00:00"); const now=new Date(); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); };
-export const isInCurrentYear  = s => { const d=new Date(s+"T12:00:00"); return d.getFullYear()===new Date().getFullYear(); };
+export const isInCurrentWeek  = s => {
+  const d   = new Date(s+"T12:00:00Z");
+  const now = mskNow();
+  const dow = now.getUTCDay();
+  const mon = new Date(now); mon.setUTCDate(now.getUTCDate()-(dow===0?6:dow-1)); mon.setUTCHours(0,0,0,0);
+  const sun = new Date(mon); sun.setUTCDate(mon.getUTCDate()+6); sun.setUTCHours(23,59,59,999);
+  return d>=mon && d<=sun;
+};
+export const isInCurrentMonth = s => {
+  const d=new Date(s+"T12:00:00Z"); const now=mskNow();
+  return d.getUTCMonth()===now.getUTCMonth() && d.getUTCFullYear()===now.getUTCFullYear();
+};
+export const isInCurrentYear  = s => {
+  const d=new Date(s+"T12:00:00Z"); return d.getUTCFullYear()===mskNow().getUTCFullYear();
+};
 
-export const daysLeft = s => { const d=new Date(s+"T23:59:59"); const now=new Date(); const diff=Math.ceil((d-now)/86400000); if(diff<0)return"просрочено"; if(diff===0)return"сегодня"; return`${diff} дн.`; };
+// daysLeft считает по МСК: конец дня s — это 23:59:59 МСК = 20:59:59 UTC.
+export const daysLeft = s => {
+  const endOfDayMsk = new Date(s+"T23:59:59Z").getTime() - MSK_OFFSET_MS;
+  const diff = Math.ceil((endOfDayMsk - Date.now()) / 86400000);
+  if(diff<0) return "просрочено";
+  if(diff===0) return "сегодня";
+  return `${diff} дн.`;
+};
 
-export const pastDay = n => { const d=new Date(); d.setDate(d.getDate()-n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+export const pastDay = n => { const d=mskNow(); d.setUTCDate(d.getUTCDate()-n); return fmtMsk(d); };
 export const mkCode  = () => Math.random().toString(36).slice(2,8).toUpperCase();
+
+// Миллисекунды до следующего 00:00 по Москве — используется хуком полуночного переноса.
+export const msUntilMoscowMidnight = () => {
+  const now  = Date.now();
+  const msk  = new Date(now + MSK_OFFSET_MS);
+  // Следующая полночь по МСК в терминах UTC
+  const nextMidnightUTC =
+    Date.UTC(msk.getUTCFullYear(), msk.getUTCMonth(), msk.getUTCDate()+1) - MSK_OFFSET_MS;
+  return nextMidnightUTC - now;
+};
 
 // ─── STRING HELPERS ───────────────────────────────────────────────
 export const isBdTitle = t => /\bдр\b|день рождения|днюха|birthday/i.test(t);

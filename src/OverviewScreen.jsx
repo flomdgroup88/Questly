@@ -8,10 +8,12 @@ const TABS = [
   { key:"month",    label:"Месяц"   },
 ];
 
-const tomorrowStr = () => {
-  const d = new Date(); d.setDate(d.getDate()+1);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-};
+// Москва UTC+3, без летнего времени
+const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
+const mskNow = () => new Date(Date.now() + MSK_OFFSET_MS);
+const fmtMsk = d => `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+
+const tomorrowStr = () => { const d=mskNow(); d.setUTCDate(d.getUTCDate()+1); return fmtMsk(d); };
 
 const MONTHS_GEN = [
   "января","февраля","марта","апреля","мая","июня",
@@ -22,15 +24,12 @@ const ORDER_KEY = "questly_overview_order_v2";
 const loadOrder  = () => { try { return JSON.parse(localStorage.getItem(ORDER_KEY)||"{}"); } catch { return {}; } };
 const saveOrder  = m  => { try { localStorage.setItem(ORDER_KEY, JSON.stringify(m)); } catch {} };
 
-const todayStr = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-};
+const todayStr = () => fmtMsk(mskNow());
 
 const isInCurrentWeek = s => {
-  const d = new Date(s+"T12:00:00"), now = new Date();
-  const mon = new Date(now); mon.setDate(now.getDate()-((now.getDay()+6)%7)); mon.setHours(0,0,0,0);
-  const sun = new Date(mon); sun.setDate(mon.getDate()+6); sun.setHours(23,59,59,999);
+  const d = new Date(s+"T12:00:00Z"), now = mskNow();
+  const mon = new Date(now); mon.setUTCDate(now.getUTCDate()-((now.getUTCDay()+6)%7)); mon.setUTCHours(0,0,0,0);
+  const sun = new Date(mon); sun.setUTCDate(mon.getUTCDate()+6); sun.setUTCHours(23,59,59,999);
   return d>=mon && d<=sun;
 };
 

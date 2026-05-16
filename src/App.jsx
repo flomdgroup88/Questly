@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { cloudSave } from "./firebase.js";
 import OverviewScreen from "./OverviewScreen.jsx";
 import { T } from "./theme.js";
@@ -17,6 +17,7 @@ import ProfileScreen from "./screens/ProfileScreen.jsx";
 import SocialScreen from "./screens/SocialScreen.jsx";
 import { useTasks } from "./hooks/useTasks.js";
 import { useCloudSync } from "./hooks/useCloudSync.js";
+import { useMidnightRollover } from "./hooks/useMidnightRollover.js";
 
 // ─── TELEGRAM WEBAPP INIT ─────────────────────────────────────────
 const tg = typeof window !== "undefined" && window.Telegram?.WebApp;
@@ -82,6 +83,12 @@ export default function App() {
       if (n)          setNickname(n);
     },
   });
+
+  // ── Полуночный перенос задач (00:00 МСК) ─────────────────────────
+  // eventsRef держит свежий массив событий без перезапуска эффекта при каждом изменении.
+  const eventsRef = useRef(events);
+  useEffect(() => { eventsRef.current = events; }, [events]);
+  useMidnightRollover({ setTasks, eventsRef });
 
   // ── Импорт данных из JSON-файла ───────────────────────────────────
   const handleImport = useCallback((data) => {
