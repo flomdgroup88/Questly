@@ -4,6 +4,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot, runTransaction } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,8 +17,11 @@ const firebaseConfig = {
 };
 
 const app  = initializeApp(firebaseConfig);
-export const db   = getFirestore(app);
-export const auth = getAuth(app);
+export const db        = getFirestore(app);
+export const auth      = getAuth(app);
+export const messaging = (typeof window !== "undefined" && "serviceWorker" in navigator)
+  ? getMessaging(app)
+  : null;
 
 // ─── USER SYNC INIT ───────────────────────────────────────────────
 // Возвращает ключ для облака:
@@ -140,7 +144,7 @@ export async function cloudGetParticipants(shareCode) {
   }
 }
 
-export async function cloudUpdateMyProgress(shareCode, name, streak, history, tgId) {
+export async function cloudUpdateMyProgress(shareCode, name, streak, history, tgId, avatar) {
   // runTransaction гарантирует атомарность: если два участника отмечают выполнение
   // одновременно, Firestore повторит транзакцию и никто не потеряет свои данные.
   try {
@@ -152,7 +156,8 @@ export async function cloudUpdateMyProgress(shareCode, name, streak, history, tg
       const idx = tgId
         ? parts.findIndex(p => p.tgId ? p.tgId === tgId : p.name === name)
         : parts.findIndex(p => p.name === name);
-      const entry = { name, avatar: "👤", streak, history, lastCompleted: history[history.length-1] || null, ...(tgId?{tgId}:{}) };
+      const existing = idx >= 0 ? parts[idx] : null;
+      const entry = { name, avatar: avatar || (existing?.avatar) || "👤", streak, history, lastCompleted: history[history.length-1] || null, ...(tgId?{tgId}:{}) };
       if (idx >= 0) parts[idx] = entry; else parts.push(entry);
       tx.update(ref, { participants: parts });
     });
@@ -201,4 +206,89 @@ export async function cloudDeduplicateParticipants(shareCode) {
   } catch (e) {
     console.warn("Firebase dedup error:", e);
   }
+}
+
+// ─── FCM: Запрос разрешения и получение токена ───────────────────
+// VAPID-ключ (публичный) берётся из Firebase Console →
+//   Project Settings → Cloud Messaging → Web Push certificates → Key pair
+export async function requestNotificationPermission() {
+  if (!messaging) return { granted: false, reason: "unsupported" };
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return { granted: false, reason: "denied" };
+    return { granted: true };
+  } catch (e) {
+    console.warn("requestNotificationPermission error:", e);
+    return { granted: false, reason: "error" };
+  }
+}
+
+export async function getFCMToken() {
+  if (!messaging) return null;
+  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+  if (!vapidKey) {
+    console.warn("VITE_FIREBASE_VAPID_KEY не задан — FCM-токен не получить");
+    return null;
+  }
+  try {
+    // Убеждаемся, что firebase-messaging-sw.js зарегистрирован
+    const swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
+      scope: "/",
+      updateViaCache: "none",
+    });
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
+    return token ?? null;
+  } catch (e) {
+    console.warn("getFCMToken error:", e);
+    return null;
+  }
+}
+
+// Сохраняет FCM-токен и настройки уведомлений в Firestore
+export async function saveNotificationPrefs(userKey, { fcmToken, enabled, reminderTime }) {
+  if (!userKey) return false;
+  try {
+    await updateDoc(doc(db, "userData", userKey), {
+      fcmToken:     fcmToken ?? null,
+      notifEnabled: enabled,
+      reminderTime: reminderTime,   // "HH:MM" в UTC — сервер читает это поле
+      _notifUpdatedAt: Date.now(),
+    });
+    return true;
+  } catch (e) {
+    // Если документа ещё нет — создаём через setDoc
+    try {
+      await setDoc(doc(db, "userData", userKey), {
+        fcmToken, notifEnabled: enabled, reminderTime, _notifUpdatedAt: Date.now(),
+      }, { merge: true });
+      return true;
+    } catch (e2) {
+      console.warn("saveNotificationPrefs error:", e2);
+      return false;
+    }
+  }
+}
+
+// Загружает настройки уведомлений из Firestore
+export async function loadNotificationPrefs(userKey) {
+  if (!userKey) return null;
+  try {
+    const snap = await getDoc(doc(db, "userData", userKey));
+    if (!snap.exists()) return null;
+    const d = snap.data();
+    return {
+      fcmToken:     d.fcmToken     ?? null,
+      enabled:      d.notifEnabled ?? false,
+      reminderTime: d.reminderTime ?? "09:00",
+    };
+  } catch (e) {
+    console.warn("loadNotificationPrefs error:", e);
+    return null;
+  }
+}
+
+// Слушает foreground-уведомления (приложение открыто)
+export function onForegroundMessage(callback) {
+  if (!messaging) return () => {};
+  return onMessage(messaging, callback);
 }

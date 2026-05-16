@@ -18,6 +18,7 @@ import TasksScreen from "./screens/TasksScreen.jsx";
 import CalendarScreen from "./screens/CalendarScreen.jsx";
 import ProfileScreen from "./screens/ProfileScreen.jsx";
 import SocialScreen from "./screens/SocialScreen.jsx";
+import { useNotifications } from "./hooks/useNotifications.js";
 import { useTasks } from "./hooks/useTasks.js";
 import { useCloudSync } from "./hooks/useCloudSync.js";
 import { useMidnightRollover } from "./hooks/useMidnightRollover.js";
@@ -146,8 +147,11 @@ function OnboardingModal({ onDone }) {
 }
 
 // ─── NICKNAME GATE ────────────────────────────────────────────────
-function NicknameGateModal({ onSave, onClose }) {
+const AVATAR_OPTIONS = ["🧙","🦊","🐼","🦁","🐯","🐸","🐧","🦄","🤖","👾","🧸","🦋","🐉","🦅","🐬","🧠"];
+
+function NicknameGateModal({ onSave, onClose, initialAvatar }) {
   const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState(initialAvatar || AVATAR_OPTIONS[0]);
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 500,
@@ -156,27 +160,46 @@ function NicknameGateModal({ onSave, onClose }) {
     }}>
       <div style={{
         background: T.bg1, borderRadius: 20, padding: "28px 24px",
-        width: "100%", maxWidth: 320, border: `1px solid ${T.brd}`,
+        width: "100%", maxWidth: 340, border: `1px solid ${T.brd}`,
         boxShadow: `0 0 40px ${T.purp}33`,
       }}>
-        <div style={{ fontSize: 40, textAlign: "center", marginBottom: 12 }}>🧙</div>
-        <div style={{ fontSize: 17, fontWeight: 800, color: T.purpL, textAlign: "center", marginBottom: 6 }}>
+        <div style={{ fontSize: 52, textAlign: "center", marginBottom: 10, lineHeight: 1 }}>{avatar}</div>
+        <div style={{ fontSize: 17, fontWeight: 800, color: T.purpL, textAlign: "center", marginBottom: 4 }}>
           Как тебя зовут?
         </div>
-        <div style={{ fontSize: 13, color: T.sub, textAlign: "center", marginBottom: 20 }}>
-          Имя будет видно друзьям в соревнованиях
+        <div style={{ fontSize: 13, color: T.sub, textAlign: "center", marginBottom: 16 }}>
+          Имя и аватар будут видны друзьям в соревнованиях
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.sub, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Выбери аватар</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 6 }}>
+            {AVATAR_OPTIONS.map(em => (
+              <div
+                key={em}
+                onClick={() => setAvatar(em)}
+                style={{
+                  aspectRatio: "1", borderRadius: 10, fontSize: 22,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer",
+                  background: avatar === em ? T.purp + "44" : T.bg0,
+                  border: `2px solid ${avatar === em ? T.purp : T.brd}`,
+                  transition: "all 0.15s",
+                }}
+              >{em}</div>
+            ))}
+          </div>
         </div>
         <input
           autoFocus
           value={name}
           onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && name.trim() && onSave(name.trim())}
+          onKeyDown={e => e.key === "Enter" && name.trim() && onSave(name.trim(), avatar)}
           placeholder="Твоё имя или никнейм…"
           style={{
             width: "100%", padding: "11px 14px", borderRadius: 12,
             background: T.bg0, border: `1px solid ${T.brd}`,
             color: T.text, fontSize: 15, outline: "none",
-            marginBottom: 16, boxSizing: "border-box",
+            marginBottom: 16, boxSizing: "border-box", colorScheme: "dark",
           }}
         />
         <div style={{ display: "flex", gap: 10 }}>
@@ -191,7 +214,7 @@ function NicknameGateModal({ onSave, onClose }) {
             Позже
           </button>
           <button
-            onClick={() => name.trim() && onSave(name.trim())}
+            onClick={() => name.trim() && onSave(name.trim(), avatar)}
             disabled={!name.trim()}
             style={{
               flex: 2, padding: "11px 0", borderRadius: 12,
@@ -265,6 +288,7 @@ export default function App() {
 
   const [events,   setEvts]     = useState(saved?.events   ?? INIT_EVENTS);
   const [nickname, setNickname] = useState(saved?.nickname ?? "");
+  const [userAvatar, setUserAvatar] = useState(saved?.userAvatar ?? "🧙");
   const [tab,      setTab]      = useState("overview");
   const [overviewEditTask, setOverviewEditTask] = useState(null);
 
@@ -283,11 +307,14 @@ export default function App() {
   // Один эффект на все данные — не разбиваем на несколько,
   // чтобы не делать две записи в хранилище за один цикл рендера.
   useEffect(() => {
-    saveState({ xp, tasks, events, nickname, _savedAt: Date.now() });
+    saveState({ xp, tasks, events, nickname, userAvatar, _savedAt: Date.now() });
     saveSocial({ challenges, sharedGoals });
-  }, [xp, tasks, events, nickname, challenges, sharedGoals]);
+  }, [xp, tasks, events, nickname, userAvatar, challenges, sharedGoals]);
 
   // ── Облачный синк — через хук ─────────────────────────────────────
+  // ── Ключ пользователя для уведомлений (появляется после auth) ────
+  const [notifUserKey, setNotifUserKey] = useState(null);
+
   const { syncStatus, syncIcon, isLoading, showOfflineToast } = useCloudSync({
     xp,
     tasks,
@@ -299,6 +326,7 @@ export default function App() {
       if (e)          setEvts(e);
       if (x !== null) setXP(x);
       if (n)          setNickname(n);
+      if (data?.userAvatar) setUserAvatar(data.userAvatar);
     },
   });
 
@@ -308,12 +336,26 @@ export default function App() {
   useEffect(() => { eventsRef.current = events; }, [events]);
   useMidnightRollover({ setTasks, eventsRef });
 
+  // ── Ключ пользователя для FCM (async, после Firebase auth) ───────
+  useEffect(() => {
+    import("./firebase.js").then(({ initUserSync }) => {
+      initUserSync().then(key => { if (key) setNotifUserKey(key); });
+    });
+  }, []);
+
+  const {
+    notifEnabled, reminderTime, permissionState, saving: notifSaving,
+    foregroundNotif, enableNotifications, disableNotifications,
+    updateReminderTime, dismissForeground,
+  } = useNotifications(notifUserKey);
+
   // ── Импорт данных из JSON-файла ───────────────────────────────────
   const handleImport = useCallback((data) => {
     if (data.tasks)            setTasks(data.tasks);
     if (data.events)           setEvts(data.events);
     if (data.xp !== undefined) setXP(data.xp);
     if (data.nickname)         setNickname(data.nickname);
+    if (data.userAvatar)       setUserAvatar(data.userAvatar);
   }, [setTasks, setXP]);
 
   // ── Обработчики событий ───────────────────────────────────────────
@@ -365,7 +407,7 @@ export default function App() {
       ...ch,
       participants: [{
         name: myName,
-        avatar: "🧙",
+        avatar: userAvatar,
         streak: 0,
         history: [],
         lastCompleted: null,
@@ -459,11 +501,38 @@ export default function App() {
         <OnboardingModal onDone={() => setShowOnboarding(false)} />
       )}
 
+      {/* Foreground push-баннер */}
+      {foregroundNotif && (
+        <div onClick={dismissForeground} style={{
+          position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
+          zIndex: 9999, maxWidth: 340, width: "calc(100% - 32px)",
+          background: "linear-gradient(135deg,#1a1a3e,#2a1a4e)",
+          border: "1px solid rgba(139,92,246,0.4)",
+          borderRadius: 16, padding: "14px 18px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+          cursor: "pointer", display: "flex", gap: 12, alignItems: "flex-start",
+          animation: "slideDown 0.3s ease",
+        }}>
+          <div style={{ fontSize: 28, flexShrink: 0 }}>🗡️</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#e8d5ff", marginBottom: 2 }}>
+              {foregroundNotif.title}
+            </div>
+            <div style={{ fontSize: 13, color: "rgba(232,213,255,0.7)", lineHeight: 1.4 }}>
+              {foregroundNotif.body}
+            </div>
+          </div>
+          <div style={{ fontSize: 16, color: "rgba(232,213,255,0.4)", flexShrink: 0 }}>✕</div>
+        </div>
+      )}
+
       {/* Гейт никнейма перед «Союзниками» */}
       {showNicknameGate && (
         <NicknameGateModal
-          onSave={(name) => {
+          initialAvatar={userAvatar}
+          onSave={(name, av) => {
             setNickname(name);
+            setUserAvatar(av);
             setShowNicknameGate(false);
             setTab("social");
           }}
@@ -587,8 +656,8 @@ export default function App() {
           {tab === "overview"  && <OverviewScreen tasks={tasks} xp={xp} level={level} rank={RANKS[Math.min(level - 1, RANKS.length - 1)]} rankIcon={RANK_ICONS[Math.min(level - 1, RANK_ICONS.length - 1)]} xpProgress={progOf(xp)} onEditTask={setOverviewEditTask} onToggle={handleToggle} />}
           {tab === "tasks"     && <TasksScreen tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} />}
           {tab === "calendar"  && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
-          {tab === "social"    && <SocialScreen nickname={nickname} challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} />}
-          {tab === "profile"   && <ProfileScreen xp={xp} tasks={tasks} events={events} nickname={nickname} onSetNickname={setNickname} syncStatus={syncStatus} onImport={handleImport} onLogout={handleLogout} />}
+          {tab === "social"    && <SocialScreen nickname={nickname} userAvatar={userAvatar} challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} />}
+          {tab === "profile"   && <ProfileScreen xp={xp} tasks={tasks} events={events} nickname={nickname} onSetNickname={setNickname} userAvatar={userAvatar} onSetAvatar={setUserAvatar} syncStatus={syncStatus} onImport={handleImport} onLogout={handleLogout} notifEnabled={notifEnabled} reminderTime={reminderTime} permissionState={permissionState} notifSaving={notifSaving} onEnableNotif={enableNotifications} onDisableNotif={disableNotifications} onUpdateReminderTime={updateReminderTime} />}
         </ErrorBoundary>
       </div>
 

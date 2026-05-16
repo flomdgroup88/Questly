@@ -3,7 +3,7 @@ import { T } from "../theme.js";
 import { today, uid, mkCode } from "../utils.js";
 import { ModalOverlay, SectionLabel, StyledInput, RecurPicker, Btn, XPBar } from "../components/ui.jsx";
 import ShareSheet from "../components/ShareSheet.jsx";
-import { cloudSave, cloudFind, cloudAddParticipant, cloudGetParticipants, cloudSubscribeParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants } from "../firebase.js";
+import { cloudSave, cloudFind, cloudAddParticipant, cloudSubscribeParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants } from "../firebase.js";
 
 // ─── NEW CHALLENGE MODAL ──────────────────────────────────────────
 function NewChallengeModal({ onClose, onCreate, nickname }) {
@@ -77,7 +77,7 @@ function NewSharedGoalModal({ onClose, onCreate, nickname }) {
 }
 
 // ─── JOIN MODAL ───────────────────────────────────────────────────
-function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg, nickname }) {
+function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg, nickname, userAvatar }) {
   const [code,setCode]=useState(""); const [result,setResult]=useState(null); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const search=async(c)=>{
     if(!c){setErr("Введи код");return;}
@@ -102,7 +102,7 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg, nickn
     const tgId=tgUser?.id?String(tgUser.id):null;
     if(result.type==="challenge"){
       onJoinCh(result.data);
-      await cloudAddParticipant("challenge",result.data.shareCode,{name:userName,avatar:"👤",streak:0,lastCompleted:null,history:[],...(tgId?{tgId}:{})});
+      await cloudAddParticipant("challenge",result.data.shareCode,{name:userName,avatar:userAvatar||"👤",streak:0,lastCompleted:null,history:[],...(tgId?{tgId}:{})});
       // Дедупликация только при вступлении — не при каждом открытии
       cloudDeduplicateParticipants(result.data.shareCode).catch(()=>{});
     }else{
@@ -137,7 +137,7 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg, nickn
 }
 
 // ─── CHALLENGE DETAIL ─────────────────────────────────────────────
-function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname }) {
+function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname, userAvatar }) {
   const tgUser=typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
   const myName=nickname||tgUser?.first_name||ch._myName||"Ты";
   const myTgId=tgUser?.id?String(tgUser.id):null;
@@ -165,7 +165,7 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[ch.shareCode,myTgId,myName]);
 
-  const allParts=[{name:myName,avatar:"🧙",streak:ch.myStreak,history:ch.myHistory,isMe:true},...freshParts.map(p=>({...p,isMe:false}))].sort((a,b)=>b.streak-a.streak);
+  const allParts=[{name:myName,avatar:userAvatar||"🧙",streak:ch.myStreak,history:ch.myHistory,isMe:true},...freshParts.map(p=>({...p,isMe:false}))].sort((a,b)=>b.streak-a.streak);
   const last28=Array.from({length:28},(_,i)=>pastDay(27-i));
 
   return (
@@ -287,7 +287,7 @@ function SharedGoalDetail({ sg, onClose, onToggleItem, onAssign, onShare, onDele
 }
 
 // ─── SOCIAL SCREEN ────────────────────────────────────────────────
-export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg, nickname }) {
+export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg, nickname, userAvatar }) {
   const [tab,setTab]=useState("challenges");
   const [showNewCh,setNewCh]=useState(false);
   const [showNewSg,setNewSg]=useState(false);
@@ -296,6 +296,8 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
   const [detailSg,setDetailSg]=useState(null);
   // Всегда берём свежую версию из sharedGoals (а не снимок на момент клика),
   // чтобы отметка пункта сразу отражалась без закрытия/переоткрытия окна.
+  // Всегда берём свежую версию из state (а не снимок на момент клика)
+  const currentDetailCh = detailCh ? challenges.find(c => c.id === detailCh.id) ?? detailCh : null;
   const currentDetailSg = detailSg ? sharedGoals.find(s => s.id === detailSg.id) ?? detailSg : null;
   const [shareItem,setShare]=useState(null);
 
@@ -303,24 +305,23 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
   const myDisplayName=nickname||tgUserSocial?.first_name||"Ты";
   const myTgId=tgUserSocial?.id?String(tgUserSocial.id):null;
 
+  // Ключ зависимости — список id. Переподписываемся только при добавлении/удалении соревнований.
+  const challengeKeys=challenges.map(c=>c.id).join(",");
   useEffect(()=>{
-    // Promise.all: все соревнования загружаются параллельно за один round-trip
     const active=challenges.filter(ch=>ch.shareCode);
     if(active.length===0) return;
-    Promise.all(
-      active.map(ch=>
-        cloudGetParticipants(ch.shareCode)
-          .then(parts=>({id:ch.id,parts}))
-          .catch(()=>({id:ch.id,parts:[]}))
-      )
-    ).then(results=>{
-      results.forEach(({id,parts})=>{
-        const others=myTgId?parts.filter(p=>p.tgId?p.tgId!==myTgId:p.name!==myDisplayName):parts.filter(p=>p.name!==myDisplayName);
-        onUpdateCh(id,c=>({...c,participants:others}));
-      });
-    });
+    // onSnapshot: Firestore сам присылает обновления — теперь и в списке карточек, не только в деталях
+    const unsubs=active.map(ch=>
+      cloudSubscribeParticipants(ch.shareCode,(parts)=>{
+        const others=myTgId
+          ?parts.filter(p=>p.tgId?p.tgId!==myTgId:p.name!==myDisplayName)
+          :parts.filter(p=>p.name!==myDisplayName);
+        onUpdateCh(ch.id,c=>({...c,participants:others}));
+      })
+    );
+    return ()=>unsubs.forEach(unsub=>unsub());
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
+  },[challengeKeys]);
 
   const completeCh=async(id)=>{
     let prevCh=null;
@@ -337,7 +338,7 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
       }
       // 2. Синкаем с облаком в фоне, не блокируя UI
       if(ch.shareCode){
-        cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,newHistory,myTgId)
+        cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,newHistory,myTgId,userAvatar)
           .then(ok=>{
             if(!ok&&prevCh) onUpdateCh(id,()=>prevCh); // 3. Откат при ошибке
           });
@@ -433,9 +434,9 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
       </div>
       {showNewCh&&<NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch);setNewCh(false);}} nickname={nickname}/>}
       {showNewSg&&<NewSharedGoalModal onClose={()=>setNewSg(false)} onCreate={sg=>{onCreateSg(sg);setNewSg(false);}} nickname={nickname}/>}
-      {showJoin&&<JoinModal challenges={challenges} sharedGoals={sharedGoals} onClose={()=>setJoin(false)} onJoinCh={joinCh} onJoinSg={joinSg} nickname={nickname}/>}
+      {showJoin&&<JoinModal challenges={challenges} sharedGoals={sharedGoals} onClose={()=>setJoin(false)} onJoinCh={joinCh} onJoinSg={joinSg} nickname={nickname} userAvatar={userAvatar}/>}
       {shareItem&&<ShareSheet code={shareItem.code} title={shareItem.title} onClose={()=>setShare(null)}/>}
-      {detailCh&&<ChallengeDetail ch={detailCh} onClose={()=>setDetailCh(null)} nickname={nickname} onComplete={completeCh} onShare={()=>{setShare({code:detailCh.shareCode,title:detailCh.title});setDetailCh(null);}} onDelete={id=>{onDeleteCh(id);setDetailCh(null);}}/>}
+      {currentDetailCh&&<ChallengeDetail ch={currentDetailCh} onClose={()=>setDetailCh(null)} nickname={nickname} userAvatar={userAvatar} onComplete={completeCh} onShare={()=>{setShare({code:currentDetailCh.shareCode,title:currentDetailCh.title});setDetailCh(null);}} onDelete={id=>{onDeleteCh(id);setDetailCh(null);}}/>}
       {currentDetailSg&&<SharedGoalDetail sg={currentDetailSg} onClose={()=>setDetailSg(null)} nickname={nickname} onToggleItem={toggleSgItem} onAssign={assignSgItem} onShare={()=>{setShare({code:currentDetailSg.shareCode,title:currentDetailSg.title});setDetailSg(null);}} onDelete={id=>{onDeleteSg(id);setDetailSg(null);}}/>}
     </div>
   );

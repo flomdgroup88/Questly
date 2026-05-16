@@ -4,13 +4,14 @@ import { PERIODS, RANKS, RANK_ICONS, XP_TABLE } from "../constants.js";
 import { lvlOf, progOf, nextXP } from "../utils.js";
 import { XPBar } from "../components/ui.jsx";
 
-export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickname, syncStatus, onImport, onLogout }) {
+export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickname, userAvatar, onSetAvatar, syncStatus, onImport, onLogout, notifEnabled, reminderTime, permissionState, notifSaving, onEnableNotif, onDisableNotif, onUpdateReminderTime }) {
   const level=lvlOf(xp), rank=RANKS[Math.min(level-1,RANKS.length-1)];
   const rankIcon=RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)];
   const toNext=nextXP(xp), completed=tasks.filter(t=>t.done).length, total=tasks.length;
   const [showLevelTable,setShowLevelTable]=useState(false);
   const [editingNick,setEditingNick]=useState(false);
   const [nickDraft,setNickDraft]=useState(nickname||"");
+  const PROFILE_AVATARS=["🧙","🦊","🐼","🦁","🐯","🐸","🐧","🦄","🤖","👾","🧸","🦋","🐉","🦅","🐬","🧠"];
 
   const tgName=typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name;
   const displayName=nickname||tgName||"Герой";
@@ -69,7 +70,10 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
         <div style={{position:"absolute",top:-30,right:-30,width:120,height:120,borderRadius:"50%",background:T.purp+"22",filter:"blur(30px)",pointerEvents:"none"}}/>
         <div style={{position:"absolute",bottom:-20,left:-20,width:80,height:80,borderRadius:"50%",background:T.gold+"22",filter:"blur(20px)",pointerEvents:"none"}}/>
         <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:18}}>
-          <div style={{width:64,height:64,borderRadius:18,background:`linear-gradient(135deg,${T.purpDim},${T.bg3})`,border:`2px solid ${T.purp}66`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:`0 0 20px ${T.purp}44`}}>{rankIcon}</div>
+          <div style={{position:"relative",flexShrink:0}}>
+            <div style={{width:64,height:64,borderRadius:18,background:`linear-gradient(135deg,${T.purpDim},${T.bg3})`,border:`2px solid ${T.purp}66`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:`0 0 20px ${T.purp}44`}}>{rankIcon}</div>
+            <div style={{position:"absolute",bottom:-4,right:-4,width:26,height:26,borderRadius:8,background:T.bg1,border:`1.5px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{userAvatar||"🧙"}</div>
+          </div>
           <div style={{flex:1}}>
             <div style={{fontSize:11,color:T.sub,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700}}>Уровень {level} / 80</div>
             {editingNick?(
@@ -87,6 +91,14 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
               </div>
             )}
             <div style={{fontSize:14,color:T.purpL,fontWeight:600}}>{rank}</div>
+            <div style={{display:"flex",gap:5,marginTop:6,flexWrap:"wrap"}}>
+              {PROFILE_AVATARS.map(em=>(
+                <div key={em} onClick={()=>onSetAvatar&&onSetAvatar(em)}
+                  style={{width:28,height:28,borderRadius:7,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",
+                    background:(userAvatar||"🧙")===em?T.purp+"44":T.bg0,
+                    border:`1.5px solid ${(userAvatar||"🧙")===em?T.purp:T.brd}`,transition:"all 0.15s"}}>{em}</div>
+              ))}
+            </div>
           </div>
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:24,fontWeight:900,color:T.gold,lineHeight:1}}>{xp.toLocaleString()}</div>
@@ -185,6 +197,16 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
           </>
         )}
       </div>
+      {/* ─── Уведомления ──────────────────────────────────── */}
+      <NotificationsBlock
+        enabled={notifEnabled}
+        reminderTime={reminderTime}
+        permissionState={permissionState}
+        saving={notifSaving}
+        onEnable={onEnableNotif}
+        onDisable={onDisableNotif}
+        onChangeTime={onUpdateReminderTime}
+      />
       {/* ─── Экспорт / Импорт / Облако ─────────────────────── */}
       <DataSafetyBlock
         xp={xp} tasks={tasks} events={events} nickname={nickname}
@@ -205,6 +227,118 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
         </div>
       )}
       <div style={{height:20}}/>
+    </div>
+  );
+}
+
+
+// ─── NOTIFICATIONS BLOCK ──────────────────────────────────────────
+function NotificationsBlock({ enabled, reminderTime, permissionState, saving, onEnable, onDisable, onChangeTime }) {
+  const [localTime, setLocalTime] = useState(reminderTime ?? "09:00");
+  const [result,    setResult]    = useState(null); // "ok" | "denied" | "unsupported" | null
+  const isSupported = typeof Notification !== "undefined" && "serviceWorker" in navigator;
+
+  const handleToggle = async () => {
+    setResult(null);
+    if (enabled) {
+      await onDisable();
+    } else {
+      if (!isSupported) { setResult("unsupported"); return; }
+      const res = await onEnable(localTime);
+      if (res.ok) setResult("ok");
+      else if (res.reason === "denied") setResult("denied");
+      else setResult("error");
+    }
+  };
+
+  const handleTimeChange = (e) => {
+    setLocalTime(e.target.value);
+    if (enabled) onChangeTime(e.target.value);
+  };
+
+  const stateColor = enabled ? T.teal : T.sub;
+  const stateLabel = enabled ? "Включены" : "Выключены";
+
+  return (
+    <div style={{ background: T.bg2, border: `1px solid ${T.brd}`, borderRadius: 16, padding: "16px", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: enabled ? 14 : 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 22 }}>🔔</div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>Напоминания</div>
+            <div style={{ fontSize: 12, color: stateColor, marginTop: 1, fontWeight: 600 }}>
+              {saving ? "⏳ Сохраняем…" : stateLabel}
+            </div>
+          </div>
+        </div>
+        {/* Toggle switch */}
+        <div
+          onClick={!saving ? handleToggle : undefined}
+          style={{
+            width: 48, height: 26, borderRadius: 13, cursor: saving ? "default" : "pointer",
+            background: enabled ? T.teal : T.bg0,
+            border: `1.5px solid ${enabled ? T.teal : T.brd}`,
+            position: "relative", transition: "all 0.25s", flexShrink: 0,
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          <div style={{
+            position: "absolute", top: 2,
+            left: enabled ? 22 : 2,
+            width: 18, height: 18, borderRadius: "50%",
+            background: enabled ? "#fff" : T.sub,
+            transition: "left 0.25s",
+          }}/>
+        </div>
+      </div>
+
+      {/* Time picker — показывается когда уведомления включены */}
+      {enabled && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: T.bg0, borderRadius: 11, border: `1px solid ${T.brd}` }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Время напоминания</div>
+              <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>Ежедневно в выбранное время</div>
+            </div>
+            <input
+              type="time"
+              value={localTime}
+              onChange={handleTimeChange}
+              style={{
+                padding: "7px 10px", borderRadius: 9, border: `1px solid ${T.purp}66`,
+                background: T.bg1, color: T.text, fontSize: 16, fontWeight: 700,
+                outline: "none", colorScheme: "dark", cursor: "pointer",
+              }}
+            />
+          </div>
+          <div style={{ fontSize: 11, color: T.dim, marginTop: 8, textAlign: "center" }}>
+            Сервер отправит пуш в {localTime} каждый день.
+            Убедись, что уведомления разрешены в настройках браузера.
+          </div>
+        </div>
+      )}
+
+      {/* Результат попытки включения */}
+      {result === "denied" && (
+        <div style={{ marginTop: 10, padding: "9px 12px", background: T.rose + "22", borderRadius: 10, border: `1px solid ${T.rose}44`, fontSize: 12, color: T.rose }}>
+          🚫 Браузер заблокировал уведомления. Разреши их вручную в настройках сайта (🔒 в адресной строке).
+        </div>
+      )}
+      {result === "unsupported" && (
+        <div style={{ marginTop: 10, padding: "9px 12px", background: T.gold + "22", borderRadius: 10, border: `1px solid ${T.gold}44`, fontSize: 12, color: T.gold }}>
+          ⚠️ Пуш-уведомления не поддерживаются в этом браузере. Попробуй Chrome или Edge на компьютере.
+        </div>
+      )}
+      {result === "ok" && (
+        <div style={{ marginTop: 10, padding: "9px 12px", background: T.teal + "22", borderRadius: 10, border: `1px solid ${T.teal}44`, fontSize: 12, color: T.teal }}>
+          ✓ Отлично! Будем напоминать каждый день в {localTime}.
+        </div>
+      )}
+      {result === "error" && (
+        <div style={{ marginTop: 10, padding: "9px 12px", background: T.rose + "22", borderRadius: 10, border: `1px solid ${T.rose}44`, fontSize: 12, color: T.rose }}>
+          ⚠️ Не удалось получить FCM-токен. Проверь, что VITE_FIREBASE_VAPID_KEY задан в .env и firebase-messaging-sw.js содержит конфиг проекта.
+        </div>
+      )}
     </div>
   );
 }
