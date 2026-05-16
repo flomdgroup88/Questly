@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef, Component } from "react";
 import { cloudSave } from "./firebase.js";
+import { auth, logOut } from "./firebase.js";
+import { onAuthStateChanged } from "firebase/auth";
+import AuthScreen from "./screens/AuthScreen.jsx";
 import OverviewScreen from "./OverviewScreen.jsx";
 import { T } from "./theme.js";
 import { RANKS, RANK_ICONS } from "./constants.js";
@@ -216,6 +219,29 @@ if (tg) {
 }
 
 export default function App() {
+  // ── Auth state ────────────────────────────────────────────────
+  // undefined = ещё загружается, null = не залогинен, object = залогинен
+  const [authReady,    setAuthReady]    = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState(null);
+
+  // Слушаем Firebase Auth: срабатывает сразу при монтировании
+  // и потом каждый раз когда пользователь входит или выходит.
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user ?? null);
+      setAuthReady(true);
+    });
+    return unsub; // отписываемся при размонтировании
+  }, []);
+
+  const isTelegram = !!(tg && window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
+
+  // ── Logout ────────────────────────────────────────────────────
+  const handleLogout = useCallback(async () => {
+    await logOut();
+    // onAuthStateChanged сам обновит firebaseUser → null → покажется AuthScreen
+  }, []);
+
   // useState(() => fn) — читает localStorage только один раз при монтировании,
   // а не при каждой перерисовке компонента.
   const [saved]    = useState(() => loadState());
@@ -368,6 +394,36 @@ export default function App() {
 
   // ─────────────────────────────────────────────────────────────────
   const level = lvlOf(xp);
+
+  // ── Auth gate ─────────────────────────────────────────────────
+  // Пока Firebase не ответил — показываем загрузку
+  if (!authReady) return (
+    <div style={{
+      width: "100%", maxWidth: 420, margin: "0 auto",
+      background: T.bg0, minHeight: "100vh",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", gap: 16,
+      fontFamily: "'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif",
+    }}>
+      <div style={{ fontSize: 48, animation: "sparkle 1.5s linear infinite" }}>⚡</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: T.purpL, letterSpacing: "-0.02em" }}>
+        <span style={{ color: T.gold }}>Q</span>uestly
+      </div>
+    </div>
+  );
+
+  // Не в Telegram и не залогинен — показываем экран входа
+  if (!firebaseUser && !isTelegram) return (
+    <div style={{
+      width: "100%", maxWidth: 420, margin: "0 auto",
+      background: T.bg0, minHeight: "100vh",
+      fontFamily: "'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif",
+      color: T.text, display: "flex", flexDirection: "column",
+    }}>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0;}`}</style>
+      <AuthScreen />
+    </div>
+  );
 
   const TABS = [
     { id: "overview", label: "Главная",   icon: "🏠" },
@@ -532,7 +588,7 @@ export default function App() {
           {tab === "tasks"     && <TasksScreen tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} />}
           {tab === "calendar"  && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
           {tab === "social"    && <SocialScreen nickname={nickname} challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} />}
-          {tab === "profile"   && <ProfileScreen xp={xp} tasks={tasks} events={events} nickname={nickname} onSetNickname={setNickname} syncStatus={syncStatus} onImport={handleImport} />}
+          {tab === "profile"   && <ProfileScreen xp={xp} tasks={tasks} events={events} nickname={nickname} onSetNickname={setNickname} syncStatus={syncStatus} onImport={handleImport} onLogout={handleLogout} />}
         </ErrorBoundary>
       </div>
 

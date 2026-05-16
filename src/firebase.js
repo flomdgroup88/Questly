@@ -3,7 +3,7 @@
 // Vite автоматически подставляет переменные с префиксом VITE_
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot, runTransaction } from "firebase/firestore";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,21 +21,42 @@ export const auth = getAuth(app);
 
 // ─── USER SYNC INIT ───────────────────────────────────────────────
 // Возвращает ключ для облака:
+//   • Уже залогинен (email) → Firebase UID (постоянный)
 //   • Telegram-пользователь → "tg_{id}"  (постоянный, работает на любом устройстве)
 //   • Остальные             → Firebase anonymous UID (хранится в IndexedDB браузера)
 export async function initUserSync() {
   try {
+    // 1. Уже залогинен через email — берём uid напрямую
+    if (auth.currentUser) return auth.currentUser.uid;
+
+    // 2. Telegram
     const tgUser = typeof window !== "undefined" && window.Telegram?.WebApp?.initDataUnsafe?.user;
     if (tgUser?.id) {
       return `tg_${tgUser.id}`;          // ← устойчив к смене устройства
     }
-    // Анонимный вход — Firebase сам кэширует токен в IndexedDB
+
+    // 3. Анонимный вход — Firebase сам кэширует токен в IndexedDB
     const cred = await signInAnonymously(auth);
     return cred.user.uid;
   } catch (e) {
     console.warn("initUserSync failed:", e);
     return null;
   }
+}
+
+// ─── EMAIL AUTH ───────────────────────────────────────────────────
+export async function emailSignIn(email, password) {
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  return cred.user;
+}
+
+export async function emailRegister(email, password) {
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  return cred.user;
+}
+
+export async function logOut() {
+  await signOut(auth);
 }
 
 // ─── USER DATA SYNC ───────────────────────────────────────────────

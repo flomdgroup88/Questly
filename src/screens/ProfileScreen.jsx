@@ -4,7 +4,7 @@ import { PERIODS, RANKS, RANK_ICONS, XP_TABLE } from "../constants.js";
 import { lvlOf, progOf, nextXP } from "../utils.js";
 import { XPBar } from "../components/ui.jsx";
 
-export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickname, syncStatus, onImport }) {
+export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickname, syncStatus, onImport, onLogout }) {
   const level=lvlOf(xp), rank=RANKS[Math.min(level-1,RANKS.length-1)];
   const rankIcon=RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)];
   const toNext=nextXP(xp), completed=tasks.filter(t=>t.done).length, total=tasks.length;
@@ -190,6 +190,20 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
         xp={xp} tasks={tasks} events={events} nickname={nickname}
         syncStatus={syncStatus} onImport={onImport}
       />
+      {/* Кнопка выхода — показываем только если onLogout передан (email-пользователи) */}
+      {onLogout && (
+        <div
+          onClick={onLogout}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "13px 0", borderRadius: 14, cursor: "pointer", marginBottom: 8,
+            background: T.bg1, border: `1px solid ${T.brd}`,
+          }}
+        >
+          <span style={{ fontSize: 16 }}>🚪</span>
+          <span style={{ fontSize: 14, color: T.sub, fontWeight: 600 }}>Выйти из аккаунта</span>
+        </div>
+      )}
       <div style={{height:20}}/>
     </div>
   );
