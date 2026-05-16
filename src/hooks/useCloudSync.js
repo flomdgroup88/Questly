@@ -3,11 +3,15 @@ import { initUserSync, cloudSaveUserData, cloudLoadUserData } from "../firebase.
 import { autoRollover, spawnRecurring, today } from "../utils.js";
 
 const CLOUD_DEBOUNCE_MS = 4000;
+// Принудительная запись раз в 20 сек при непрерывных изменениях.
+// Без maxWait данные могут не попасть в облако долго при активной работе.
+const CLOUD_MAX_WAIT_MS = 20000;
 
 /**
  * Хук управляет облачным синком:
  *  - при старте авторизует пользователя и загружает данные из Firebase
  *  - при каждом изменении данных сохраняет в облако с дебаунсом 4 сек
+ *  - maxWait 20 сек гарантирует запись даже при непрерывных изменениях
  *
  * Возвращает:
  *  - syncStatus: "idle" | "saving" | "saved" | "error"
@@ -32,6 +36,7 @@ export function useCloudSync({
   const offlineToastTimer = useRef(null);
   const userKeyRef = useRef(null);
   const syncTimerRef = useRef(null);
+  const maxWaitTimerRef = useRef(null); // принудительная запись при maxWait
 
   // ── Инициализация: auth + загрузка облачных данных ───────────────
   useEffect(() => {
@@ -77,7 +82,11 @@ export function useCloudSync({
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     setSyncStatus("idle");
 
-    syncTimerRef.current = setTimeout(async () => {
+    const doSave = async () => {
+      // Сбрасываем maxWait при каждой реальной записи
+      clearTimeout(maxWaitTimerRef.current);
+      maxWaitTimerRef.current = null;
+
       setSyncStatus("saving");
       const ok = await cloudSaveUserData(userKeyRef.current, {
         xp,
@@ -98,9 +107,24 @@ export function useCloudSync({
         offlineToastTimer.current = setTimeout(() => setShowOfflineToast(false), 4000);
         setTimeout(() => setSyncStatus("idle"), 3000);
       }
-    }, CLOUD_DEBOUNCE_MS);
+    };
 
-    return () => clearTimeout(syncTimerRef.current);
+    // Дебаунс: ждём паузы в 4 сек после последнего изменения
+    syncTimerRef.current = setTimeout(doSave, CLOUD_DEBOUNCE_MS);
+
+    // maxWait: если изменения идут непрерывно, всё равно пишем раз в 20 сек
+    if (!maxWaitTimerRef.current) {
+      maxWaitTimerRef.current = setTimeout(() => {
+        clearTimeout(syncTimerRef.current);
+        doSave();
+      }, CLOUD_MAX_WAIT_MS);
+    }
+
+    return () => {
+      clearTimeout(syncTimerRef.current);
+      // maxWaitTimer не сбрасываем в cleanup — он должен сработать
+      // даже если эффект перезапустился из-за нового изменения
+    };
   }, [xp, tasks, events, nickname]);
 
   const syncIcon =

@@ -1,6 +1,6 @@
 // ─── FIREBASE CONFIG ──────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot, runTransaction } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
@@ -80,14 +80,32 @@ export async function cloudSave(type, item) {
 // ─── SOCIAL: Найти по коду ────────────────────────────────────────
 export async function cloudFind(code) {
   const c = code.trim().toUpperCase();
-  const chSnap = await getDoc(doc(db, "challenges", c));
+  // Оба запроса идут параллельно — поиск вдвое быстрее
+  const [chSnap, sgSnap] = await Promise.all([
+    getDoc(doc(db, "challenges", c)),
+    getDoc(doc(db, "sharedGoals", c)),
+  ]);
   if (chSnap.exists()) return { type: "challenge", data: chSnap.data() };
-  const sgSnap = await getDoc(doc(db, "sharedGoals", c));
   if (sgSnap.exists()) return { type: "goal", data: sgSnap.data() };
   return null;
 }
 
 // ─── SOCIAL: Участники ────────────────────────────────────────────
+
+// Подписка в реальном времени на участников соревнования.
+// Возвращает функцию unsubscribe — вызови её при размонтировании компонента.
+// callback получает массив participants каждый раз, когда он меняется в Firestore.
+export function cloudSubscribeParticipants(shareCode, callback) {
+  const ref = doc(db, "challenges", shareCode);
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (snap.exists()) callback(snap.data().participants || []);
+    },
+    (err) => console.warn("cloudSubscribeParticipants error:", err)
+  );
+}
+
 export async function cloudGetParticipants(shareCode) {
   try {
     const snap = await getDoc(doc(db, "challenges", shareCode));
@@ -100,16 +118,21 @@ export async function cloudGetParticipants(shareCode) {
 }
 
 export async function cloudUpdateMyProgress(shareCode, name, streak, history, tgId) {
+  // runTransaction гарантирует атомарность: если два участника отмечают выполнение
+  // одновременно, Firestore повторит транзакцию и никто не потеряет свои данные.
   try {
-    const snap = await getDoc(doc(db, "challenges", shareCode));
-    if (!snap.exists()) return false;
-    const parts = snap.data().participants || [];
-    const idx = tgId
-      ? parts.findIndex(p => p.tgId ? p.tgId === tgId : p.name === name)
-      : parts.findIndex(p => p.name === name);
-    const entry = { name, avatar: "👤", streak, history, lastCompleted: history[history.length-1] || null, ...(tgId?{tgId}:{}) };
-    if (idx >= 0) parts[idx] = entry; else parts.push(entry);
-    await updateDoc(doc(db, "challenges", shareCode), { participants: parts });
+    const ref = doc(db, "challenges", shareCode);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return;
+      const parts = snap.data().participants || [];
+      const idx = tgId
+        ? parts.findIndex(p => p.tgId ? p.tgId === tgId : p.name === name)
+        : parts.findIndex(p => p.name === name);
+      const entry = { name, avatar: "👤", streak, history, lastCompleted: history[history.length-1] || null, ...(tgId?{tgId}:{}) };
+      if (idx >= 0) parts[idx] = entry; else parts.push(entry);
+      tx.update(ref, { participants: parts });
+    });
     return true;
   } catch (e) {
     console.warn("Firebase updateMyProgress error:", e);

@@ -3,14 +3,16 @@ import { T } from "../theme.js";
 import { today, uid, mkCode } from "../utils.js";
 import { ModalOverlay, SectionLabel, StyledInput, RecurPicker, Btn, XPBar } from "../components/ui.jsx";
 import ShareSheet from "../components/ShareSheet.jsx";
-import { cloudSave, cloudFind, cloudAddParticipant, cloudGetParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants } from "../firebase.js";
+import { cloudSave, cloudFind, cloudAddParticipant, cloudGetParticipants, cloudSubscribeParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants } from "../firebase.js";
 
 // ─── NEW CHALLENGE MODAL ──────────────────────────────────────────
 function NewChallengeModal({ onClose, onCreate, nickname }) {
   const [title,setTitle]=useState(""); const [emoji,setEmoji]=useState("🏋️"); const [desc,setDesc]=useState(""); const [rt,setRT]=useState("day");
+  const [submitting,setSubmitting]=useState(false);
   const EMOJIS=["🏋️","🏃","🧘","📚","💧","🌅","🎯","💪","🚴","🍎","✏️","🎸"];
   const submit=()=>{
-    if(!title.trim()) return;
+    if(!title.trim()||submitting) return;
+    setSubmitting(true); // блокируем кнопку от повторного нажатия
     const tgUser=typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
     const creatorName=nickname||tgUser?.first_name||"Создатель";
     onCreate({id:uid(),title:title.trim(),emoji,desc:desc.trim(),shareCode:mkCode(),recurType:rt,createdAt:today(),myStreak:0,myHistory:[],participants:[],_myName:creatorName});
@@ -31,7 +33,7 @@ function NewChallengeModal({ onClose, onCreate, nickname }) {
       <div style={{marginBottom:18}}><SectionLabel>Периодичность</SectionLabel><RecurPicker value={rt} onChange={setRT}/></div>
       <div style={{display:"flex",gap:10}}>
         <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
-        <Btn variant="primary" onClick={submit} style={{flex:2}} disabled={!title.trim()}>Создать ⚡</Btn>
+        <Btn variant="primary" onClick={submit} style={{flex:2}} disabled={!title.trim()||submitting}>Создать ⚡</Btn>
       </div>
     </ModalOverlay>
   );
@@ -40,9 +42,11 @@ function NewChallengeModal({ onClose, onCreate, nickname }) {
 // ─── NEW SHARED GOAL MODAL ────────────────────────────────────────
 function NewSharedGoalModal({ onClose, onCreate, nickname }) {
   const [title,setTitle]=useState(""); const [itemText,setItemText]=useState(""); const [items,setItems]=useState([]);
+  const [submitting,setSubmitting]=useState(false);
   const addItem=()=>{if(!itemText.trim())return;setItems(p=>[...p,{id:uid(),title:itemText.trim(),assignedTo:null,doneBy:null,done:false}]);setItemText("");};
   const submit=()=>{
-    if(!title.trim()||items.length===0) return;
+    if(!title.trim()||items.length===0||submitting) return;
+    setSubmitting(true); // блокируем кнопку от повторного нажатия
     onCreate({id:uid(),title:title.trim(),emoji:"🎯",shareCode:mkCode(),createdAt:today(),participants:[nickname||"Я"],items});
     onClose();
   };
@@ -66,7 +70,7 @@ function NewSharedGoalModal({ onClose, onCreate, nickname }) {
       </div>
       <div style={{display:"flex",gap:10}}>
         <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
-        <Btn variant="teal" onClick={submit} style={{flex:2}} disabled={!title.trim()||items.length===0}>Создать 🎯</Btn>
+        <Btn variant="teal" onClick={submit} style={{flex:2}} disabled={!title.trim()||items.length===0||submitting}>Создать 🎯</Btn>
       </div>
     </ModalOverlay>
   );
@@ -99,6 +103,8 @@ function JoinModal({ challenges, sharedGoals, onClose, onJoinCh, onJoinSg, nickn
     if(result.type==="challenge"){
       onJoinCh(result.data);
       await cloudAddParticipant("challenge",result.data.shareCode,{name:userName,avatar:"👤",streak:0,lastCompleted:null,history:[],...(tgId?{tgId}:{})});
+      // Дедупликация только при вступлении — не при каждом открытии
+      cloudDeduplicateParticipants(result.data.shareCode).catch(()=>{});
     }else{
       onJoinSg(result.data);
       await cloudAddParticipant("goal",result.data.shareCode,userName);
@@ -139,25 +145,25 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname 
   const period=ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно";
   const [freshParts,setFreshParts]=useState(ch.participants||[]);
   const [syncing,setSyncing]=useState(false);
+  // Оптимистик: локальный флаг — кнопка реагирует мгновенно, не ждёт родителя
+  const [doneToday,setDoneToday]=useState(ch.myHistory.includes(today()));
+  const [saving,setSaving]=useState(false);
+  const [saveErr,setSaveErr]=useState(false);
 
   const pastDay=n=>{const d=new Date();d.setDate(d.getDate()-n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
 
-  const refresh=(dedup=false)=>{
+  useEffect(()=>{
     if(!ch.shareCode) return;
     setSyncing(true);
-    const fetchParts=dedup?cloudDeduplicateParticipants(ch.shareCode).then(()=>cloudGetParticipants(ch.shareCode)):cloudGetParticipants(ch.shareCode);
-    fetchParts.then(parts=>{
+    // onSnapshot: Firestore присылает обновления сам — setInterval больше не нужен
+    const unsub=cloudSubscribeParticipants(ch.shareCode,(parts)=>{
       const others=myTgId?parts.filter(p=>p.tgId?p.tgId!==myTgId:p.name!==myName):parts.filter(p=>p.name!==myName);
-      setFreshParts(others);setSyncing(false);
-    }).catch(()=>setSyncing(false));
-  };
-
-  useEffect(()=>{
-    refresh(true);
-    const timer=setInterval(()=>refresh(false),15000);
-    return()=>clearInterval(timer);
+      setFreshParts(others);
+      setSyncing(false);
+    });
+    return unsub; // отписка при закрытии модала
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[ch.shareCode,myName]);
+  },[ch.shareCode,myTgId,myName]);
 
   const allParts=[{name:myName,avatar:"🧙",streak:ch.myStreak,history:ch.myHistory,isMe:true},...freshParts.map(p=>({...p,isMe:false}))].sort((a,b)=>b.streak-a.streak);
   const last28=Array.from({length:28},(_,i)=>pastDay(27-i));
@@ -166,7 +172,9 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname 
     <ModalOverlay onClose={onClose}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
         <button onClick={onClose} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",borderRadius:10,background:T.bg0,border:`1px solid ${T.brd}`,color:T.sub,fontSize:13,fontWeight:600,cursor:"pointer"}}>← Назад</button>
-        <button onClick={refresh} style={{padding:"8px 12px",borderRadius:10,background:T.bg0,border:`1px solid ${T.brd}`,color:syncing?T.dim:T.teal,fontSize:13,fontWeight:600,cursor:"pointer"}}>{syncing?"⏳":"🔄 Обновить"}</button>
+        <div style={{fontSize:12,fontWeight:600,color:syncing?T.dim:T.teal,display:"flex",alignItems:"center",gap:5}}>
+          {syncing?<>⏳ Подключение…</>:<><span style={{width:7,height:7,borderRadius:"50%",background:T.teal,display:"inline-block"}}/>в реальном времени</>}
+        </div>
       </div>
       <div style={{textAlign:"center",marginBottom:16}}>
         <div style={{fontSize:44,marginBottom:4}}>{ch.emoji}</div>
@@ -213,7 +221,23 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname 
       </div>
       <div style={{display:"flex",gap:10,marginBottom:10}}>
         <Btn variant="ghost" onClick={onShare} style={{flex:1}}>🔗 Поделиться</Btn>
-        <Btn variant={myDoneToday?"ghost":"primary"} onClick={()=>{if(!myDoneToday){onComplete(ch.id);onClose();}}} style={{flex:2}} disabled={myDoneToday}>{myDoneToday?"✓ Сделано сегодня":"Отметить сегодня ✓"}</Btn>
+        <Btn
+          variant={doneToday?"ghost":"primary"}
+          style={{flex:2,transition:"all 0.2s",opacity:saving?0.7:1}}
+          disabled={doneToday||saving}
+          onClick={async()=>{
+            if(doneToday||saving) return;
+            setDoneToday(true); // мгновенная реакция кнопки
+            setSaving(true);
+            setSaveErr(false);
+            await onComplete(ch.id);
+            setSaving(false);
+            // закрываем с небольшой задержкой — пользователь видит ✓
+            setTimeout(onClose,600);
+          }}
+        >
+          {saving?"⏳ Сохраняем…":doneToday?"✓ Сделано сегодня":"Отметить сегодня ✓"}
+        </Btn>
       </div>
       <Btn variant="danger" onClick={()=>{onDelete(ch.id);onClose();}}>🗑 Удалить соревнование</Btn>
     </ModalOverlay>
@@ -277,19 +301,30 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
   const myTgId=tgUserSocial?.id?String(tgUserSocial.id):null;
 
   useEffect(()=>{
-    challenges.forEach(ch=>{
-      if(!ch.shareCode) return;
-      cloudGetParticipants(ch.shareCode).then(parts=>{
+    // Promise.all: все соревнования загружаются параллельно за один round-trip
+    const active=challenges.filter(ch=>ch.shareCode);
+    if(active.length===0) return;
+    Promise.all(
+      active.map(ch=>
+        cloudGetParticipants(ch.shareCode)
+          .then(parts=>({id:ch.id,parts}))
+          .catch(()=>({id:ch.id,parts:[]}))
+      )
+    ).then(results=>{
+      results.forEach(({id,parts})=>{
         const others=myTgId?parts.filter(p=>p.tgId?p.tgId!==myTgId:p.name!==myDisplayName):parts.filter(p=>p.name!==myDisplayName);
-        onUpdateCh(ch.id,c=>({...c,participants:others}));
-      }).catch(()=>{});
+        onUpdateCh(id,c=>({...c,participants:others}));
+      });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
-  const completeCh=id=>{
+  const completeCh=async(id)=>{
+    let prevCh=null;
+    // 1. Сразу обновляем локальный стейт — UI реагирует мгновенно
     onUpdateCh(id,ch=>{
       if(ch.myHistory.includes(today())) return ch;
+      prevCh=ch; // запоминаем для отката
       const newHistory=[...(ch.myHistory),today()];
       let streak=0;
       const sorted=[...newHistory].sort();
@@ -297,7 +332,13 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
         let cur=today();streak=1;
         while(true){const d=new Date(cur);d.setDate(d.getDate()-1);const prev=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(sorted.includes(prev)){streak++;cur=prev;}else break;}
       }
-      if(ch.shareCode) cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,newHistory,myTgId);
+      // 2. Синкаем с облаком в фоне, не блокируя UI
+      if(ch.shareCode){
+        cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,newHistory,myTgId)
+          .then(ok=>{
+            if(!ok&&prevCh) onUpdateCh(id,()=>prevCh); // 3. Откат при ошибке
+          });
+      }
       return {...ch,myHistory:newHistory,myStreak:streak};
     });
   };
