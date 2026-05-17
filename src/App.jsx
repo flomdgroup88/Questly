@@ -12,10 +12,11 @@
  *  • nickname / avatar   → src/context/UserContext.tsx
  */
 
-import { useCallback }       from "react";
+import { useCallback, useEffect } from "react";
 import { T }                 from "./theme.js";
 import { RANKS, RANK_ICONS } from "./constants.js";
 import { lvlOf, progOf, loadState } from "./utils.js";
+import { initUserSync, cloudPublishProfile } from "./firebase.js";
 import { XPBar }             from "./components/ui.jsx";
 import { ErrorBoundary }     from "./components/ErrorBoundary";
 import { OnboardingModal }   from "./components/OnboardingModal";
@@ -68,6 +69,15 @@ function AppInner() {
 
   const isTelegram = !!(tg && window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
   const level      = lvlOf(xp);
+
+  // Публикуем профиль в Firestore сразу при изменении никнейма или аватара —
+  // не ждём, когда пользователь откроет вкладку «Друзья».
+  useEffect(() => {
+    if (!nickname) return;
+    initUserSync().then(key => {
+      if (key) cloudPublishProfile(key, nickname, userAvatar, []);
+    });
+  }, [nickname, userAvatar]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTabChange = useCallback((id) => {
     if (id === "social" && !nickname) setShowNicknameGate(true);
