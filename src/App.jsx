@@ -23,6 +23,8 @@ import { OnboardingModal }   from "./components/OnboardingModal";
 import { NicknameGateModal } from "./components/NicknameGateModal";
 import { UserProvider, useUser } from "./context/UserContext";
 import { useAppState }       from "./hooks/useAppState";
+import { useAchievements }   from "./hooks/useAchievements";
+import { AchievementToast }  from "./components/AchievementToast.jsx";
 import AuthScreen            from "./screens/AuthScreen.jsx";
 import OverviewScreen        from "./OverviewScreen.jsx";
 import TaskModal             from "./screens/TaskModal.jsx";
@@ -77,6 +79,7 @@ function AppInner() {
     showNicknameGate, setShowNicknameGate,
     overviewEditTask, setOverviewEditTask,
     handleToggle, handleSave, handleDelete, handleShopToggle,
+    handleReorder,
     handleImport,
     handleAddEvent, handleEditEvent, handleDeleteEvent,
     handleUpdateCh, handleUpdateSg,
@@ -86,6 +89,11 @@ function AppInner() {
 
   const isTelegram = !!(tg && window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
   const level      = lvlOf(xp);
+
+  // ── Ачивки ────────────────────────────────────────────────────────
+  const { achievementQueue, dismissAchievement } = useAchievements({
+    tasks, xp, events, challenges,
+  });
 
   // Публикуем профиль в Firestore при изменении никнейма, аватара или соревнований.
   // Используем debounce 2 сек чтобы не спамить при быстрых изменениях.
@@ -240,7 +248,7 @@ function AppInner() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <ErrorBoundary key={tab}>
           {tab === "overview"  && <OverviewScreen tasks={tasks} xp={xp} level={level} rank={RANKS[Math.min(level-1,RANKS.length-1)]} rankIcon={RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)]} xpProgress={progOf(xp)} onEditTask={setOverviewEditTask} onToggle={handleToggle} />}
-          {tab === "tasks"     && <TasksScreen    tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} />}
+          {tab === "tasks"     && <TasksScreen    tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} onReorder={handleReorder} />}
           {tab === "calendar"  && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
           {tab === "social"    && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} nickname={nickname} userAvatar={userAvatar} xp={xp} />}
           {tab === "profile"   && <ProfileScreen  xp={xp} tasks={tasks} events={events} challenges={challenges} nickname={nickname} userAvatar={userAvatar} onSetNickname={setNickname} onSetAvatar={setUserAvatar} onImport={handleImport} onLogout={handleLogout} notifEnabled={notif.notifEnabled} reminderTime={notif.reminderTime} permissionState={notif.permissionState} notifSaving={notif.saving} onEnableNotif={notif.enableNotifications} onDisableNotif={notif.disableNotifications} onUpdateReminderTime={notif.updateReminderTime} isDark={isDark} onToggleTheme={toggleTheme} />}
@@ -256,6 +264,15 @@ function AppInner() {
           </div>
         ))}
       </div>
+
+      {achievementQueue.length > 0 && (
+        <AchievementToast
+          key={achievementQueue[0].label}
+          achievement={achievementQueue[0]}
+          onDismiss={dismissAchievement}
+          queueLength={achievementQueue.length - 1}
+        />
+      )}
 
       {showGlobalCreate && <TaskModal onClose={() => setShowGlobalCreate(false)} onSave={t => { handleSave(t); setShowGlobalCreate(false); }} />}
       {overviewEditTask  && <TaskModal existing={overviewEditTask} onClose={() => setOverviewEditTask(null)} onSave={t => { handleSave(t); setOverviewEditTask(null); }} onDelete={id => { handleDelete(id); setOverviewEditTask(null); }} />}
