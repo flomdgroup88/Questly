@@ -6,36 +6,11 @@ import { PeriodBadge } from "../components/ui.jsx";
 import EventModal from "./EventModal.jsx";
 import TaskModal from "./TaskModal.jsx";
 
-// ─── Проверяем, попадает ли дата в период задачи ──────────────────
-// Для week-задачи с дедлайном 20 мая — показываем всю неделю до 20го.
-// Для month-задачи — весь месяц. Для year — весь год.
-const getMondayOf = d => {
-  const dow = d.getUTCDay();
-  const mon = new Date(d);
-  mon.setUTCDate(d.getUTCDate() - (dow === 0 ? 6 : dow - 1));
-  mon.setUTCHours(0, 0, 0, 0);
-  return mon;
-};
-
+// ─── Проверяем, совпадает ли дата задачи с выбранным днём ─────────
+// Показываем задачу только в её точную дату дедлайна (dueDate).
 const isDateInTaskPeriod = (task, selDate) => {
   if (!task.dueDate) return false;
-  if (task.dueDate === selDate) return true;
-  if (task.period === "day") return false; // дневные — только на свой день
-  if (task.period === "week") {
-    // любой день той же календарной недели (пн–вс) что и dueDate
-    const due = new Date(task.dueDate + "T12:00:00Z");
-    const sel = new Date(selDate + "T12:00:00Z");
-    return getMondayOf(due).getTime() === getMondayOf(sel).getTime();
-  }
-  if (task.period === "month") {
-    // тот же месяц
-    return task.dueDate.slice(0, 7) === selDate.slice(0, 7);
-  }
-  if (task.period === "year") {
-    // тот же год
-    return task.dueDate.slice(0, 4) === selDate.slice(0, 4);
-  }
-  return false;
+  return task.dueDate === selDate;
 };
 
 // ─── CALENDAR GRID ────────────────────────────────────────────────
