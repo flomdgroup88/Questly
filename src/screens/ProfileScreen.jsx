@@ -217,11 +217,12 @@ export default function ProfileScreen({ xp, tasks, events, challenges = [], nick
         <XPBar progress={doneCount/ACHIEVEMENTS.length} color={T.gold} height={4}/>
         <div style={{marginTop:14,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           {(showAllAchievements?ACHIEVEMENTS:ACHIEVEMENTS.slice(0,VISIBLE_ACHIEVEMENTS)).map(a=>(
-            <div key={a.label} style={{background:a.done?T.gold+"22":T.bg0,border:`1px solid ${a.done?T.gold+"66":T.brd}`,borderRadius:11,padding:"12px",transition:"all 0.3s"}}>
+            <div key={a.label} style={{background:a.done?T.teal+"22":T.bg0,border:`1px solid ${a.done?T.teal+"66":T.brd}`,borderRadius:11,padding:"12px",transition:"all 0.3s"}}>
               <div style={{fontSize:22,marginBottom:4,filter:a.done?"none":"grayscale(0.8) opacity(0.4)"}}>{a.icon}</div>
-              <div style={{fontSize:12,fontWeight:700,color:a.done?T.gold:T.sub}}>{a.label}</div>
-              <div style={{fontSize:10,color:a.done?T.goldDim:T.dim,marginTop:3,lineHeight:1.4}}>{a.desc}</div>
+              <div style={{fontSize:12,fontWeight:700,color:a.done?T.teal:T.sub}}>{a.label}</div>
+              <div style={{fontSize:10,color:a.done?T.tealDim:T.dim,marginTop:3,lineHeight:1.4}}>{a.desc}</div>
               {!a.done&&<div style={{fontSize:9,color:T.dim,marginTop:4,fontWeight:600,letterSpacing:"0.04em"}}>🔒 не открыто</div>}
+              {a.done&&<div style={{fontSize:9,color:T.teal,marginTop:4,fontWeight:700,letterSpacing:"0.04em"}}>✓ выполнено</div>}
             </div>
           ))}
           <div onClick={()=>setShowAllAchievements(v=>!v)} style={{gridColumn:"1/-1",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",borderRadius:11,cursor:"pointer",background:T.bg0,border:`1px solid ${T.brd}`,marginTop:2}}>
