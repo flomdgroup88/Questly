@@ -135,7 +135,14 @@ export const loadState = (): AppState | null => {
     return state;
   } catch { return null; }
 };
-export const saveState = (s: AppState): void => { try { localStorage.setItem(LS, JSON.stringify(s)); } catch { /* ignore */ } };
+export const saveState = (s: AppState): void => {
+  try {
+    const raw = localStorage.getItem(LS);
+    const existing = raw ? JSON.parse(raw) : {};
+    // Мержим с существующими данными — так nickname/userAvatar из UserContext не затираются
+    localStorage.setItem(LS, JSON.stringify({ ...existing, ...s }));
+  } catch { /* ignore */ }
+};
 
 export const loadSocial = (): SocialState | null => {
   try { const r = localStorage.getItem(LS_SOC); return r ? (JSON.parse(r) as SocialState) : null; } catch { return null; }
