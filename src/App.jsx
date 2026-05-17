@@ -70,14 +70,17 @@ function AppInner() {
   const isTelegram = !!(tg && window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
   const level      = lvlOf(xp);
 
-  // Публикуем профиль в Firestore сразу при изменении никнейма или аватара —
-  // не ждём, когда пользователь откроет вкладку «Друзья».
+  // Публикуем профиль в Firestore при изменении никнейма, аватара или соревнований.
+  // Используем debounce 2 сек чтобы не спамить при быстрых изменениях.
   useEffect(() => {
     if (!nickname) return;
-    initUserSync().then(key => {
-      if (key) cloudPublishProfile(key, nickname, userAvatar, []);
-    });
-  }, [nickname, userAvatar]); // eslint-disable-line react-hooks/exhaustive-deps
+    const timer = setTimeout(() => {
+      initUserSync().then(key => {
+        if (key) cloudPublishProfile(key, nickname, userAvatar, challenges);
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [nickname, userAvatar, challenges]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTabChange = useCallback((id) => {
     if (id === "social" && !nickname) setShowNicknameGate(true);

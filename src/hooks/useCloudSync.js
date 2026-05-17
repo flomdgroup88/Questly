@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, cloudSaveUserData, cloudLoadUserData } from "../firebase.js";
+import { auth, cloudSaveUserData, cloudLoadUserData, initUserSync } from "../firebase.js";
 import { autoRollover, spawnRecurring, today } from "../utils.js";
 
 const CLOUD_DEBOUNCE_MS = 4000;
@@ -43,6 +43,9 @@ export function useCloudSync({
 
   // ── Подписка на Auth: реагируем на вход / выход / восстановление сессии ──
   useEffect(() => {
+    // Запускаем анонимный вход заранее — иначе onAuthStateChanged может не сработать
+    initUserSync().catch(() => {});
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         // Не залогинен — сбрасываем ключ, показываем локальные данные
@@ -52,15 +55,10 @@ export function useCloudSync({
         return;
       }
 
-      const key = user.uid;
-
-      // Пользователь уже залогинен анонимно — пропускаем (анонимный UID не стабилен)
-      if (user.isAnonymous) {
-        userKeyRef.current = null;
-        loadedForUserRef.current = null;
-        setIsLoading(false);
-        return;
-      }
+      // Для Telegram-пользователей используем tg_{id} вместо нестабильного анонимного UID.
+      // Для всех остальных (анонимных и email) используем Firebase UID.
+      const tgUser = typeof window !== "undefined" && window.Telegram?.WebApp?.initDataUnsafe?.user;
+      const key = (tgUser?.id) ? `tg_${tgUser.id}` : user.uid;
 
       // Новый пользователь — загружаем его данные
       if (loadedForUserRef.current !== key) {
