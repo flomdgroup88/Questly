@@ -60,7 +60,7 @@ function AppInner() {
     applyTheme(next);
     setIsDark(next);
     if (tg) {
-      const bg = next ? "#07071C" : "#FFFFFF";
+      const bg = next ? "#07071C" : "#FBFAFF";
       tg.setHeaderColor(bg);
       tg.setBackgroundColor(bg);
     }

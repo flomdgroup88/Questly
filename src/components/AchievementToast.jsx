@@ -36,7 +36,7 @@ function makeParticles() {
 }
 
 // ─── Цветовые схемы по категориям ────────────────────────────────
-const CAT_THEMES: Record<string, { from: string; to: string; border: string; label: string }> = {
+const CAT_THEMES = {
   tasks:  { from:"#1E0F4A", to:"#130A30", border:"#8B5CF6", label:"Задача выполнена" },
   level:  { from:"#2A1A00", to:"#180F00", border:"#F5A623", label:"Новый уровень!" },
   streak: { from:"#2A0A10", to:"#180610", border:"#F43F5E", label:"Серия засчитана" },
@@ -94,21 +94,8 @@ const KEYFRAMES = `
   }
 `;
 
-interface Achievement {
-  icon:  string;
-  label: string;
-  desc:  string;
-  cat:   string;
-}
-
-interface Props {
-  achievement: Achievement;
-  onDismiss:   () => void;
-  queueLength: number;   // сколько ещё в очереди после этой
-}
-
-export function AchievementToast({ achievement, onDismiss, queueLength }: Props) {
-  const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
+export function AchievementToast({ achievement, onDismiss, queueLength }) {
+  const [phase, setPhase] = useState("in");
   const particles = useRef(makeParticles()).current;
 
   const theme = CAT_THEMES[achievement.cat] ?? CAT_THEMES.tasks;
@@ -155,8 +142,8 @@ export function AchievementToast({ achievement, onDismiss, queueLength }: Props)
               borderRadius: p.isSquare ? "2px" : "50%",
               background: p.color,
               // CSS custom props для анимации
-              ["--tx" as any]: `${p.tx}px`,
-              ["--ty" as any]: `${p.ty}px`,
+              ["--tx"]: `${p.tx}px`,
+              ["--ty"]: `${p.ty}px`,
               animation: `ach-particle 0.85s cubic-bezier(.2,.8,.4,1) ${p.delay}s both`,
             }}
           />
