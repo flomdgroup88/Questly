@@ -4,6 +4,39 @@ import { MONTHS_RU, WDAYS, EVENT_TYPES } from "../constants.js";
 import { today, fmtDate } from "../utils";
 import { PeriodBadge } from "../components/ui.jsx";
 import EventModal from "./EventModal.jsx";
+import TaskModal from "./TaskModal.jsx";
+
+// ─── Проверяем, попадает ли дата в период задачи ──────────────────
+// Для week-задачи с дедлайном 20 мая — показываем всю неделю до 20го.
+// Для month-задачи — весь месяц. Для year — весь год.
+const getMondayOf = d => {
+  const dow = d.getUTCDay();
+  const mon = new Date(d);
+  mon.setUTCDate(d.getUTCDate() - (dow === 0 ? 6 : dow - 1));
+  mon.setUTCHours(0, 0, 0, 0);
+  return mon;
+};
+
+const isDateInTaskPeriod = (task, selDate) => {
+  if (!task.dueDate) return false;
+  if (task.dueDate === selDate) return true;
+  if (task.period === "day") return false; // дневные — только на свой день
+  if (task.period === "week") {
+    // любой день той же календарной недели (пн–вс) что и dueDate
+    const due = new Date(task.dueDate + "T12:00:00Z");
+    const sel = new Date(selDate + "T12:00:00Z");
+    return getMondayOf(due).getTime() === getMondayOf(sel).getTime();
+  }
+  if (task.period === "month") {
+    // тот же месяц
+    return task.dueDate.slice(0, 7) === selDate.slice(0, 7);
+  }
+  if (task.period === "year") {
+    // тот же год
+    return task.dueDate.slice(0, 4) === selDate.slice(0, 4);
+  }
+  return false;
+};
 
 // ─── CALENDAR GRID ────────────────────────────────────────────────
 function CalendarGrid({ year, month, events, tasks, selectedDate, onSelect }) {
@@ -61,13 +94,14 @@ function CalendarGrid({ year, month, events, tasks, selectedDate, onSelect }) {
 }
 
 // ─── CALENDAR SCREEN ──────────────────────────────────────────────
-export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent, onDeleteEvent }) {
+export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent, onDeleteEvent, onSaveTask, onDeleteTask }) {
   const now=new Date();
   const [month,setMonth]=useState(now.getMonth());
   const [year,setYear]=useState(now.getFullYear());
   const [selDate,setSel]=useState(today);
   const [showModal,setModal]=useState(false);
   const [editEvent,setEditEvent]=useState(null);
+  const [editTask,setEditTask]=useState(null);  // ← для редактирования задач
 
   const prev=()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);};
   const next=()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);};
@@ -81,12 +115,16 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
     if(ev.recurring&&ev.recurType==="day") return true;
     return false;
   });
-  // Show tasks planned for this date OR completed on this date (from doneHistory)
+
+  // Показываем задачи, если:
+  // • их dueDate попадает в период (вся неделя / месяц / год), а не только точная дата
+  // • либо задача выполнена именно в этот день (doneHistory)
   const selTaskIds=new Set();
   const selTasks=tasks.filter(t=>{
-    const byDue=t.dueDate===selDate;
-    const byDone=t.done&&(t.doneHistory||[]).includes(selDate);
-    if((byDue||byDone)&&!selTaskIds.has(t.id)){selTaskIds.add(t.id);return true;}
+    if(selTaskIds.has(t.id)) return false;
+    const inPeriod = isDateInTaskPeriod(t, selDate);
+    const byDone   = t.done && (t.doneHistory||[]).includes(selDate);
+    if(inPeriod||byDone){ selTaskIds.add(t.id); return true; }
     return false;
   });
 
@@ -133,13 +171,16 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
             ))}
             {selTasks.length>0&&<div style={{fontSize:11,color:T.dim,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8,fontWeight:700}}>Квесты на этот день</div>}
             {selTasks.map(t=>(
-              <div key={t.id} style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:11,padding:"11px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+              <div key={t.id} onClick={()=>onSaveTask&&setEditTask(t)} style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:11,padding:"11px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10,cursor:onSaveTask?"pointer":"default",transition:"opacity 0.15s"}}
+              onMouseEnter={e=>{if(onSaveTask)e.currentTarget.style.opacity="0.8";}}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
                 <div style={{width:22,height:22,borderRadius:"50%",background:t.done?T.teal+"44":"transparent",border:`2px solid ${t.done?T.teal:T.dim}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>{t.done&&"✓"}</div>
                 <div style={{flex:1}}>
                   <div style={{fontSize:14,color:t.done?T.sub:T.text,textDecoration:t.done?"line-through":"none"}}>{t.title}</div>
                   <div style={{fontSize:11,marginTop:2,fontWeight:700,color:t.done?T.teal:T.gold}}>{t.done?`✓ +${t.xp} XP`:`+${t.xp} XP`}{t.done&&t.dueDate!==selDate&&<span style={{color:T.dim,fontWeight:400}}> · план: {t.dueDate.slice(5).replace("-",".")}</span>}</div>
                 </div>
                 <PeriodBadge period={t.period} small/>
+                {onSaveTask&&<div style={{fontSize:12,color:T.sub,flexShrink:0}}>✏️</div>}
               </div>
             ))}
           </>
@@ -148,6 +189,7 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
       </div>
       {showModal&&<EventModal onClose={()=>setModal(false)} onCreate={onAddEvent} defaultDate={selDate}/>}
       {editEvent&&<EventModal existing={editEvent} onClose={()=>setEditEvent(null)} onUpdate={onEditEvent} onDelete={onDeleteEvent}/>}
+      {editTask&&<TaskModal existing={editTask} onClose={()=>setEditTask(null)} onSave={t=>{onSaveTask(t);setEditTask(null);}} onDelete={onDeleteTask?id=>{onDeleteTask(id);setEditTask(null);}:undefined}/>}
     </div>
   );
 }
