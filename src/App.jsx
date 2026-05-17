@@ -52,6 +52,7 @@ function AppInner() {
     xp, xpAnim, lvlUpAnim,
     syncStatus, syncIcon, isLoading, showOfflineToast,
     notif,
+    loginBonus,
     tab, setTab,
     showOnboarding, setShowOnboarding,
     showGlobalCreate, setShowGlobalCreate,
@@ -106,6 +107,7 @@ function AppInner() {
         @keyframes lvlGlow{0%,100%{opacity:0;transform:scale(.8)}20%,80%{opacity:1;transform:scale(1)}}
         @keyframes sparkle{0%{transform:rotate(0deg) scale(1)}50%{transform:rotate(180deg) scale(1.1)}100%{transform:rotate(360deg) scale(1)}}
         @keyframes toastSlide{0%{opacity:0;transform:translateX(-50%) translateY(20px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}85%{opacity:1;transform:translateX(-50%) translateY(0)}100%{opacity:0;transform:translateX(-50%) translateY(10px)}}
+        @keyframes bonusSlide{0%{opacity:0;transform:translateX(-50%) translateY(-32px) scale(0.9)}12%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}80%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-16px) scale(0.95)}}
       `}</style>
 
       {showOnboarding && (
@@ -143,13 +145,34 @@ function AppInner() {
         </div>
       )}
 
+      {loginBonus && (
+        <div style={{ position: "fixed", top: 20, left: "50%", zIndex: 9000, pointerEvents: "none", animation: "bonusSlide 4.5s ease forwards", background: `linear-gradient(135deg, ${T.bg2}, #1a1540)`, border: `1px solid ${T.gold}66`, borderRadius: 20, padding: "14px 20px", display: "flex", alignItems: "center", gap: 14, boxShadow: `0 8px 32px #0009, 0 0 24px ${T.gold}33`, whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 32, flexShrink: 0 }}>
+            {loginBonus.streak >= 7 ? "🔥" : loginBonus.streak >= 3 ? "✨" : "☀️"}
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: T.gold, marginBottom: 2 }}>
+              Бонус за вход · День {loginBonus.streak}
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: "#fff" }}>
+              +{loginBonus.xp} XP
+              {loginBonus.streak > 1 && (
+                <span style={{ fontSize: 12, fontWeight: 600, color: T.goldL, marginLeft: 8 }}>
+                  🔥 {loginBonus.streak}-дневная серия!
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {xpAnim && (
         <div style={{ position: "fixed", top: "25%", left: "50%", transform: "translateX(-50%)", zIndex: 300, pointerEvents: "none", textAlign: "center", animation: "xpFloat 2.2s ease forwards" }}>
           <div style={{ fontSize: 32, fontWeight: 900, color: xpAnim.negative ? T.rose : T.gold }}>
             {xpAnim.negative ? "−" : "+"}{xpAnim.amount} XP
           </div>
           <div style={{ fontSize: 14, color: xpAnim.negative ? T.rose : T.goldL, marginTop: 2 }}>
-            {xpAnim.negative ? "↩️ Квест отменён" : "✨ Квест выполнен!"}
+            {xpAnim.negative ? "↩️ Квест отменён" : xpAnim.bonus ? "☀️ Бонус за вход!" : "✨ Квест выполнен!"}
           </div>
         </div>
       )}

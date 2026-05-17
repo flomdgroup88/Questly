@@ -50,7 +50,38 @@ export function useAppState() {
     xp, setXP,
     xpAnim, lvlUpAnim,
     handleToggle, handleSave, handleDelete, handleShopToggle,
+    grantXP,
   } = useTasks(saved?.tasks ?? [], saved?.xp ?? 0);
+
+  // ── Бонус за ежедневный вход ──────────────────────────────────────
+  const [loginBonus, setLoginBonus] = useState<{xp: number, streak: number} | null>(null);
+
+  useEffect(() => {
+    const LS_LOGIN = "questly_login_v1";
+    const todayDate = today();
+    try {
+      const raw  = localStorage.getItem(LS_LOGIN);
+      const data = raw ? JSON.parse(raw) : { lastDate: null, streak: 0 };
+      if (data.lastDate === todayDate) return; // уже получил бонус сегодня
+
+      // Считаем стрик: бонус если вчера тоже заходил
+      const d = new Date(); d.setDate(d.getDate() - 1);
+      const yesterday = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      const newStreak = data.lastDate === yesterday ? (data.streak || 0) + 1 : 1;
+
+      // XP: 10 базовых + по 2 за каждый день стрика, максимум 40
+      const bonusXP = Math.min(10 + (newStreak - 1) * 2, 40);
+
+      localStorage.setItem(LS_LOGIN, JSON.stringify({ lastDate: todayDate, streak: newStreak }));
+
+      // Задержка — приложение успевает смонтироваться
+      setTimeout(() => {
+        grantXP(bonusXP);
+        setLoginBonus({ xp: bonusXP, streak: newStreak });
+        setTimeout(() => setLoginBonus(null), 4500);
+      }, 1500);
+    } catch { /* не критично */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── События и соцфичи ─────────────────────────────────────────────
   const [events,      setEvts]       = useState<QuestlyEvent[]>(saved?.events      ?? []);
@@ -181,6 +212,8 @@ export function useAppState() {
     syncStatus, syncIcon, isLoading, showOfflineToast,
     // Уведомления
     notif,
+    // Бонус за вход
+    loginBonus,
     // UI
     tab, setTab,
     showOnboarding, setShowOnboarding,

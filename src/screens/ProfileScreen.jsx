@@ -116,12 +116,15 @@ export default function ProfileScreen({ xp, tasks, events, challenges = [], nick
           <div style={{flex:1}}>
             <div style={{fontSize:11,color:T.sub,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700}}>Уровень {level} / 80</div>
             {editingNick?(
-              <div style={{display:"flex",gap:6,alignItems:"center",marginTop:4,marginBottom:4}}>
+              <div style={{marginTop:4,marginBottom:4}}>
                 <input autoFocus value={nickDraft} onChange={e=>setNickDraft(e.target.value)}
                   onKeyDown={e=>{if(e.key==="Enter")saveNick();if(e.key==="Escape")setEditingNick(false);}}
                   placeholder="Введи ник…" maxLength={24}
-                  style={{flex:1,padding:"6px 10px",background:T.bg0,border:`1px solid ${T.purp}`,borderRadius:9,color:T.text,fontSize:16,fontWeight:800,outline:"none",colorScheme:"dark"}}/>
-                <div onClick={saveNick} style={{padding:"6px 12px",borderRadius:9,cursor:"pointer",background:T.purp,color:"#fff",fontSize:13,fontWeight:700,flexShrink:0}}>✓</div>
+                  style={{width:"100%",boxSizing:"border-box",padding:"8px 10px",background:T.bg0,border:`1.5px solid ${T.purp}`,borderRadius:9,color:T.text,fontSize:16,fontWeight:800,outline:"none",colorScheme:"dark",marginBottom:8,display:"block"}}/>
+                <div style={{display:"flex",gap:6}}>
+                  <div onClick={()=>setEditingNick(false)} style={{flex:1,padding:"7px 0",borderRadius:9,cursor:"pointer",background:T.bg0,border:`1px solid ${T.brd}`,color:T.sub,fontSize:13,fontWeight:600,textAlign:"center"}}>Отмена</div>
+                  <div onClick={saveNick} style={{flex:2,padding:"7px 0",borderRadius:9,cursor:"pointer",background:nickDraft.trim()?T.purp:T.bg3,color:nickDraft.trim()?"#fff":T.dim,fontSize:13,fontWeight:700,textAlign:"center",transition:"all 0.15s"}}>Сохранить ✓</div>
+                </div>
               </div>
             ):(
               <div style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",overflow:"hidden"}} onClick={()=>{setNickDraft(nickname||"");setEditingNick(true);}}>

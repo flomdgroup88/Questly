@@ -107,6 +107,22 @@ export function useTasks(initialTasks, initialXP) {
     );
   }, []);
 
+  // ── Начислить XP извне (бонус за вход и др.) ─────────────────────
+  const grantXP = useCallback((amount) => {
+    setXP((prevXP) => {
+      const newXP = prevXP + amount;
+      const newLvl = lvlOf(newXP);
+      if (newLvl > prevLvlRef.current) {
+        setLvlUp(true);
+        setTimeout(() => setLvlUp(false), 3000);
+        prevLvlRef.current = newLvl;
+      }
+      return newXP;
+    });
+    setXPAnim({ amount, bonus: true });
+    setTimeout(() => setXPAnim(null), 2200);
+  }, []);
+
   return {
     tasks,
     setTasks,
@@ -118,5 +134,6 @@ export function useTasks(initialTasks, initialXP) {
     handleSave,
     handleDelete,
     handleShopToggle,
+    grantXP,
   };
 }
