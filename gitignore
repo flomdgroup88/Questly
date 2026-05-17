@@ -1,0 +1,14 @@
+# Зависимости
+node_modules/
+
+# Сборка — генерируется командой npm run build, не хранить в git
+dist/
+
+# Переменные окружения — содержат секретные ключи!
+.env
+.env.local
+.env.production
+
+# Системное
+.DS_Store
+*.bak
