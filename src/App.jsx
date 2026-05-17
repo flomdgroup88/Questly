@@ -190,7 +190,7 @@ function AppInner() {
           {tab === "tasks"     && <TasksScreen    tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} />}
           {tab === "calendar"  && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
           {tab === "social"    && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} />}
-          {tab === "profile"   && <ProfileScreen  xp={xp} tasks={tasks} events={events} onImport={handleImport} onLogout={handleLogout} notifEnabled={notif.notifEnabled} reminderTime={notif.reminderTime} permissionState={notif.permissionState} notifSaving={notif.saving} onEnableNotif={notif.enableNotifications} onDisableNotif={notif.disableNotifications} onUpdateReminderTime={notif.updateReminderTime} />}
+          {tab === "profile"   && <ProfileScreen  xp={xp} tasks={tasks} events={events} challenges={challenges} onImport={handleImport} onLogout={handleLogout} notifEnabled={notif.notifEnabled} reminderTime={notif.reminderTime} permissionState={notif.permissionState} notifSaving={notif.saving} onEnableNotif={notif.enableNotifications} onDisableNotif={notif.disableNotifications} onUpdateReminderTime={notif.updateReminderTime} />}
         </ErrorBoundary>
       </div>
 

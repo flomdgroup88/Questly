@@ -4,7 +4,7 @@ import { PERIODS, RANKS, RANK_ICONS } from "../constants.js";
 import { lvlOf, progOf, nextXP, today } from "../utils.js";
 import { XPBar } from "../components/ui.jsx";
 
-export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickname, userAvatar, onSetAvatar, syncStatus, onImport, onLogout, notifEnabled, reminderTime, permissionState, notifSaving, onEnableNotif, onDisableNotif, onUpdateReminderTime }) {
+export default function ProfileScreen({ xp, tasks, events, challenges = [], nickname, onSetNickname, userAvatar, onSetAvatar, syncStatus, onImport, onLogout, notifEnabled, reminderTime, permissionState, notifSaving, onEnableNotif, onDisableNotif, onUpdateReminderTime }) {
   const level=lvlOf(xp), rank=RANKS[Math.min(level-1,RANKS.length-1)];
   const rankIcon=RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)];
   const toNext=nextXP(xp), completed=tasks.filter(t=>t.done).length, total=tasks.length;
@@ -76,7 +76,7 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
     {icon:"🧠",label:"Стратег",           desc:"Цели на неделю, месяц и год одновременно", done:["week","month","year"].every(p=>tasks.some(t=>t.period===p)), cat:"bonus"},
     {icon:"🎯",label:"Снайпер",           desc:"Выполни 10 задач подряд без пропуска", done:bestStreak>=10, cat:"bonus"},
     {icon:"🌈",label:"Многозадачность",   desc:"Задачи во всех 5 периодах",      done:["day","week","month","year","dream"].every(p=>tasks.some(t=>t.period===p)), cat:"bonus"},
-    {icon:"💬",label:"Социальный",        desc:"Участвуй в соревновании",        done:false, cat:"bonus"},
+    {icon:"💬",label:"Социальный",        desc:"Участвуй в соревновании",        done:challenges.length>0, cat:"bonus"},
     {icon:"🤝",label:"Командный игрок",   desc:"Добавь встречу",                 done:events.some(e=>e.eventType==="meeting"), cat:"events"},
     {icon:"🏥",label:"ЗОЖ",              desc:"Добавь событие здоровья",         done:events.some(e=>e.eventType==="health"), cat:"events"},
     {icon:"📖",label:"Книжный червь",     desc:"Выполни 3 книжных задачи",       done:tasks.filter(t=>t.done&&t.title?.toLowerCase().includes("книг")).length>=1, cat:"bonus"},
@@ -124,8 +124,8 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
                 <div onClick={saveNick} style={{padding:"6px 12px",borderRadius:9,cursor:"pointer",background:T.purp,color:"#fff",fontSize:13,fontWeight:700,flexShrink:0}}>✓</div>
               </div>
             ):(
-              <div style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}} onClick={()=>{setNickDraft(nickname||"");setEditingNick(true);}}>
-                <div style={{fontSize:22,fontWeight:900,color:T.text,lineHeight:1.1}}>{displayName}</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",overflow:"hidden"}} onClick={()=>{setNickDraft(nickname||"");setEditingNick(true);}}>
+                <div style={{fontSize:22,fontWeight:900,color:T.text,lineHeight:1.1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName}</div>
                 <div style={{fontSize:12,color:T.sub,background:T.bg3,border:`1px solid ${T.brd}`,borderRadius:6,padding:"2px 7px",flexShrink:0}}>✏️</div>
               </div>
             )}
