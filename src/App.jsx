@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect } from "react";
-import { T }                 from "./theme.js";
+import { T, applyTheme, loadThemeIsDark } from "./theme.js";
 import { RANKS, RANK_ICONS } from "./constants.js";
 import { lvlOf, progOf, loadState } from "./utils";
 import { initUserSync, cloudPublishProfile } from "./firebase.js";
@@ -46,6 +46,23 @@ const TABS = [
 // ─── Внутренний компонент — читает UserContext ─────────────────────────
 function AppInner() {
   const { nickname, userAvatar, setNickname, setUserAvatar } = useUser();
+
+  // ── Тема ──────────────────────────────────────────────────────────
+  const [isDark, setIsDark] = useState(() => {
+    const d = loadThemeIsDark();
+    applyTheme(d);
+    return d;
+  });
+  const toggleTheme = () => {
+    const next = !isDark;
+    applyTheme(next);
+    setIsDark(next);
+    if (tg) {
+      const bg = next ? "#07071C" : "#FFFFFF";
+      tg.setHeaderColor(bg);
+      tg.setBackgroundColor(bg);
+    }
+  };
 
   const {
     authReady, firebaseUser, handleLogout,
@@ -111,8 +128,8 @@ function AppInner() {
     <div style={{ ...shellStyle, maxHeight: "100vh", position: "relative", overflow: "hidden" }}>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-        input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.7);cursor:pointer;}
-        input[type=date]{color-scheme:dark;}
+        input[type=date]::-webkit-calendar-picker-indicator{filter:${isDark?"invert(0.7)":"invert(0.3)"};cursor:pointer;}
+        input[type=date]{color-scheme:${isDark?"dark":"light"};}
         ::-webkit-scrollbar{width:3px;}
         ::-webkit-scrollbar-thumb{background:${T.brd};border-radius:2px;}
         @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -226,7 +243,7 @@ function AppInner() {
           {tab === "tasks"     && <TasksScreen    tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} />}
           {tab === "calendar"  && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
           {tab === "social"    && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} nickname={nickname} userAvatar={userAvatar} xp={xp} />}
-          {tab === "profile"   && <ProfileScreen  xp={xp} tasks={tasks} events={events} challenges={challenges} nickname={nickname} userAvatar={userAvatar} onSetNickname={setNickname} onSetAvatar={setUserAvatar} onImport={handleImport} onLogout={handleLogout} notifEnabled={notif.notifEnabled} reminderTime={notif.reminderTime} permissionState={notif.permissionState} notifSaving={notif.saving} onEnableNotif={notif.enableNotifications} onDisableNotif={notif.disableNotifications} onUpdateReminderTime={notif.updateReminderTime} />}
+          {tab === "profile"   && <ProfileScreen  xp={xp} tasks={tasks} events={events} challenges={challenges} nickname={nickname} userAvatar={userAvatar} onSetNickname={setNickname} onSetAvatar={setUserAvatar} onImport={handleImport} onLogout={handleLogout} notifEnabled={notif.notifEnabled} reminderTime={notif.reminderTime} permissionState={notif.permissionState} notifSaving={notif.saving} onEnableNotif={notif.enableNotifications} onDisableNotif={notif.disableNotifications} onUpdateReminderTime={notif.updateReminderTime} isDark={isDark} onToggleTheme={toggleTheme} />}
         </ErrorBoundary>
       </div>
 
