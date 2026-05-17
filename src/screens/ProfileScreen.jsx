@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { T } from "../theme.js";
 import { PERIODS, RANKS, RANK_ICONS } from "../constants.js";
-import { lvlOf, progOf, nextXP } from "../utils.js";
+import { lvlOf, progOf, nextXP, today } from "../utils.js";
 import { XPBar } from "../components/ui.jsx";
 
 export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickname, userAvatar, onSetAvatar, syncStatus, onImport, onLogout, notifEnabled, reminderTime, permissionState, notifSaving, onEnableNotif, onDisableNotif, onUpdateReminderTime }) {
@@ -22,6 +22,13 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
   const hasShopTask=tasks.some(t=>t.shopItems&&t.shopItems.length>0);
   const shopItemsDone=tasks.reduce((acc,t)=>acc+(t.shopItems?t.shopItems.filter(i=>i.done).length:0),0);
   const allPeriodsCovered=["day","week","month","year"].every(p=>tasks.some(t=>t.period===p));
+
+  // New achievement vars
+  const todayStr=today();
+  const todayDayTasks=tasks.filter(t=>t.period==="day"&&t.dueDate===todayStr);
+  const perfectDay=todayDayTasks.length>=3&&todayDayTasks.every(t=>t.done);
+  const completedOnSunday=tasks.some(t=>(t.doneHistory||[]).some(d=>new Date(d).getDay()===0));
+  const activeDays=new Set(tasks.flatMap(t=>t.doneHistory||[])).size;
 
   const ACHIEVEMENTS=[
     // ── Задачи ──────────────────────────────────────────
@@ -78,6 +85,11 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
     {icon:"✈️",label:"Вечно в пути",      desc:"Добавь 3 поездки",               done:events.filter(e=>e.eventType==="trip").length>=3, cat:"events"},
     {icon:"🎓",label:"Самообразование",   desc:"Учись каждую неделю 4 недели",   done:bestStreak>=28, cat:"bonus"},
     {icon:"🌙",label:"Ночной режим",      desc:"Выполни 50 задач",               done:completed>=50, cat:"tasks"},
+    {icon:"🏅",label:"Первая десятка",    desc:"Выполни 10 задач",               done:completed>=10, cat:"tasks"},
+    // ── Новые: разнообразные ────────────────────────────────────
+    {icon:"🌞",label:"Идеальный день",    desc:"Закрой все дневные задачи (мин. 3)", done:perfectDay, cat:"bonus"},
+    {icon:"😴",label:"Воскресный герой",  desc:"Выполни задачу в воскресенье",   done:completedOnSunday, cat:"bonus"},
+    {icon:"📆",label:"Активист",          desc:"Выполняй задачи 7 разных дней",  done:activeDays>=7, cat:"bonus"},
     {icon:"🦅",label:"Орёл",             desc:"Серия 14 дней",                  done:bestStreak>=14, cat:"streak"},
     {icon:"🏆",label:"Чемпион",          desc:"Серия 60 дней",                  done:bestStreak>=60, cat:"streak"},
     {icon:"💎",label:"Бриллиант",        desc:"Серия 200 дней",                 done:bestStreak>=200,cat:"streak"},

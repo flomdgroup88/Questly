@@ -158,22 +158,12 @@ export const autoRollover = (tasks: Task[]): Task[] => tasks.map(t => {
   return t;
 });
 
-// Returns true if `day` (YYYY-MM-DD) matches the monthly recurrence of a task
-// whose original dueDate is `dueDate`. If the original day (e.g. 31) doesn't
-// exist in the target month, the last day of that month is used instead.
-const matchesMonthDay = (dueDate: string, day: string): boolean => {
-  const origDay = new Date(dueDate).getDate();
-  const [dy, dm] = day.split("-").map(Number);
-  const lastDayOfMonth = new Date(dy, dm, 0).getDate();
-  return new Date(day).getDate() === Math.min(origDay, lastDayOfMonth);
-};
-
 export const spawnRecurring = (tasks: Task[], events: QuestlyEvent[], day: string): Task[] => {
   const next = [...tasks];
   tasks.filter(t => t.recurring && t.dueDate !== day).forEach(t => {
     const ok = t.recurType === "day"
       || (t.recurType === "week"  && new Date(t.dueDate).getDay() === new Date(day).getDay())
-      || (t.recurType === "month" && matchesMonthDay(t.dueDate, day))
+      || (t.recurType === "month" && new Date(t.dueDate).getDate() === new Date(day).getDate())
       || (t.recurType === "year"  && t.dueDate.slice(5) === day.slice(5));
     // Используем templateId для дедупликации — надёжнее, чем сравнение по названию.
     const tplId = t.templateId || t.id;

@@ -6,7 +6,7 @@ import { PeriodBadge } from "../components/ui.jsx";
 import EventModal from "./EventModal.jsx";
 
 // ─── CALENDAR GRID ────────────────────────────────────────────────
-function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
+function CalendarGrid({ year, month, events, tasks, selectedDate, onSelect }) {
   const first=new Date(year,month,1);
   const last=new Date(year,month+1,0);
   const startDow=(first.getDay()+6)%7;
@@ -22,6 +22,10 @@ function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
     if(ev.recurring&&ev.recurType==="week"){const dow=new Date(ev.date).getDay();for(let d=1;d<=last.getDate();d++)if(new Date(year,month,d).getDay()===dow)add(d);}
     if(ev.recurring&&ev.recurType==="day") for(let d=1;d<=last.getDate();d++) add(d);
   });
+
+  // Build map of days that have completed tasks (from doneHistory)
+  const completedDays=new Set();
+  (tasks||[]).forEach(t=>{(t.doneHistory||[]).forEach(d=>{const [dy,dm,dd]=d.split("-").map(Number);if(dy===year&&dm===month+1)completedDays.add(dd);});});
 
   const now=new Date(),tD=now.getDate(),tM=now.getMonth(),tY=now.getFullYear();
   const isThisMonth=month===tM&&year===tY;
@@ -44,7 +48,10 @@ function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
           return (
             <div key={day} onClick={()=>onSelect(`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`)} style={{aspectRatio:"1",borderRadius:8,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:isSel?T.purp:isToday?T.bg3:"transparent",border:isToday&&!isSel?`1.5px solid ${T.purp}`:"1.5px solid transparent",transition:"all 0.15s",padding:"2px 0"}}>
               <span style={{fontSize:12,fontWeight:isToday?800:400,lineHeight:1,color:isSel?"#fff":isToday?T.purpL:hasBd?T.gold:T.text}}>{day}</span>
-              {colors.length>0&&<div style={{display:"flex",gap:2,marginTop:2}}>{colors.map((c,ci)=><div key={ci} style={{width:4,height:4,borderRadius:"50%",background:c}}/>)}</div>}
+              <div style={{display:"flex",gap:2,marginTop:2}}>
+                {colors.map((c,ci)=><div key={ci} style={{width:4,height:4,borderRadius:"50%",background:c}}/>)}
+                {completedDays.has(day)&&<div style={{width:4,height:4,borderRadius:"50%",background:isSel?"#ffffff99":T.teal}}/>}
+              </div>
             </div>
           );
         })}
@@ -74,7 +81,14 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
     if(ev.recurring&&ev.recurType==="day") return true;
     return false;
   });
-  const selTasks=tasks.filter(t=>t.dueDate===selDate);
+  // Show tasks planned for this date OR completed on this date (from doneHistory)
+  const selTaskIds=new Set();
+  const selTasks=tasks.filter(t=>{
+    const byDue=t.dueDate===selDate;
+    const byDone=t.done&&(t.doneHistory||[]).includes(selDate);
+    if((byDue||byDone)&&!selTaskIds.has(t.id)){selTaskIds.add(t.id);return true;}
+    return false;
+  });
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -86,7 +100,7 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
       </div>
 
       <div style={{padding:"8px 12px 6px",flexShrink:0}}>
-        <CalendarGrid year={year} month={month} events={events} selectedDate={selDate} onSelect={setSel}/>
+        <CalendarGrid year={year} month={month} events={events} tasks={tasks} selectedDate={selDate} onSelect={setSel}/>
       </div>
       <div style={{height:1,background:T.brd}}/>
 
@@ -123,7 +137,7 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
                 <div style={{width:22,height:22,borderRadius:"50%",background:t.done?T.teal+"44":"transparent",border:`2px solid ${t.done?T.teal:T.dim}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>{t.done&&"✓"}</div>
                 <div style={{flex:1}}>
                   <div style={{fontSize:14,color:t.done?T.sub:T.text,textDecoration:t.done?"line-through":"none"}}>{t.title}</div>
-                  <div style={{fontSize:11,color:T.gold,marginTop:2,fontWeight:700}}>+{t.xp} XP</div>
+                  <div style={{fontSize:11,marginTop:2,fontWeight:700,color:t.done?T.teal:T.gold}}>{t.done?`✓ +${t.xp} XP`:`+${t.xp} XP`}{t.done&&t.dueDate!==selDate&&<span style={{color:T.dim,fontWeight:400}}> · план: {t.dueDate.slice(5).replace("-",".")}</span>}</div>
                 </div>
                 <PeriodBadge period={t.period} small/>
               </div>

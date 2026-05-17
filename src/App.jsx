@@ -82,11 +82,17 @@ const ONBOARDING_STEPS = [
   {
     emoji: "🤝",
     title: "Союзники рядом",
-    text: "В разделе «Союзники» можно соревноваться с друзьями или вести общие списки дел. Начнём?",
+    text: "В разделе «Союзники» можно соревноваться с друзьями или вести общие списки дел.",
+  },
+  {
+    emoji: "🎯",
+    title: "Создай первый квест!",
+    text: "Нажми кнопку ниже и добавь свою первую задачу. Первый шаг — самый важный.",
+    isAction: true,
   },
 ];
 
-function OnboardingModal({ onDone }) {
+function OnboardingModal({ onDone, onCreateFirst }) {
   const [step, setStep] = useState(0);
   const s = ONBOARDING_STEPS[step];
   const isLast = step === ONBOARDING_STEPS.length - 1;
@@ -119,17 +125,39 @@ function OnboardingModal({ onDone }) {
         <div style={{ fontSize: 14, color: T.sub, lineHeight: 1.6, marginBottom: 32 }}>
           {s.text}
         </div>
-        <button
-          onClick={() => isLast ? onDone() : setStep(s => s + 1)}
-          style={{
-            width: "100%", padding: "14px 0", borderRadius: 16,
-            border: "none", background: T.purp, color: "#fff",
-            fontSize: 15, fontWeight: 800, cursor: "pointer",
-            boxShadow: `0 4px 20px ${T.purp}66`,
-          }}
-        >
-          {isLast ? "Начать приключение! ⚡" : "Далее →"}
-        </button>
+        {s.isAction ? (
+          <>
+            <button
+              onClick={onCreateFirst}
+              style={{
+                width: "100%", padding: "14px 0", borderRadius: 16,
+                border: "none", background: `linear-gradient(135deg,${T.purp},${T.gold})`,
+                color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer",
+                boxShadow: `0 4px 20px ${T.purp}66`, marginBottom: 10,
+              }}
+            >
+              ⚔️ Создать первый квест
+            </button>
+            <button
+              onClick={onDone}
+              style={{ background: "none", border: "none", color: T.dim, fontSize: 13, cursor: "pointer" }}
+            >
+              Пропустить
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => isLast ? onDone() : setStep(s => s + 1)}
+            style={{
+              width: "100%", padding: "14px 0", borderRadius: 16,
+              border: "none", background: T.purp, color: "#fff",
+              fontSize: 15, fontWeight: 800, cursor: "pointer",
+              boxShadow: `0 4px 20px ${T.purp}66`,
+            }}
+          >
+            {isLast ? "Начать приключение! ⚡" : "Далее →"}
+          </button>
+        )}
         {!isLast && (
           <button
             onClick={onDone}
@@ -272,6 +300,7 @@ export default function App() {
 
   // Показываем онбординг только новым пользователям (нет сохранённых данных).
   const [showOnboarding,   setShowOnboarding]   = useState(() => !loadState());
+  const [showGlobalCreate, setShowGlobalCreate] = useState(false);
   // Показываем окно никнейма перед входом в «Союзники», если имя не задано.
   const [showNicknameGate, setShowNicknameGate] = useState(false);
 
@@ -282,18 +311,18 @@ export default function App() {
     xpAnim, lvlUpAnim,
     handleToggle, handleSave, handleDelete, handleShopToggle,
   } = useTasks(
-    saved?.tasks ?? INIT_TASKS,
-    saved?.xp    ?? 340
+    saved?.tasks ?? [],
+    saved?.xp    ?? 0
   );
 
-  const [events,   setEvts]     = useState(saved?.events   ?? INIT_EVENTS);
+  const [events,   setEvts]     = useState(saved?.events   ?? []);
   const [nickname, setNickname] = useState(saved?.nickname ?? "");
   const [userAvatar, setUserAvatar] = useState(saved?.userAvatar ?? "🧙");
   const [tab,      setTab]      = useState("overview");
   const [overviewEditTask, setOverviewEditTask] = useState(null);
 
-  const [challenges,  setChallenges]  = useState(savedSoc?.challenges  ?? INIT_CHALLENGES);
-  const [sharedGoals, setSharedGoals] = useState(savedSoc?.sharedGoals ?? INIT_SHARED_GOALS);
+  const [challenges,  setChallenges]  = useState(savedSoc?.challenges  ?? []);
+  const [sharedGoals, setSharedGoals] = useState(savedSoc?.sharedGoals ?? []);
 
   // ── Спаун повторяющихся задач при старте ─────────────────────────
   // Запускается один раз при монтировании (как componentDidMount).
@@ -502,7 +531,7 @@ export default function App() {
 
       {/* Онбординг для новых пользователей */}
       {showOnboarding && (
-        <OnboardingModal onDone={() => setShowOnboarding(false)} />
+        <OnboardingModal onDone={() => setShowOnboarding(false)} onCreateFirst={() => { setShowOnboarding(false); setTab("tasks"); setShowGlobalCreate(true); }} />
       )}
 
       {/* Foreground push-баннер */}
@@ -683,6 +712,14 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* Быстрое создание задачи (из онбординга) */}
+      {showGlobalCreate && (
+        <TaskModal
+          onClose={() => setShowGlobalCreate(false)}
+          onSave={(t) => { handleSave(t); setShowGlobalCreate(false); }}
+        />
+      )}
 
       {/* Редактирование задачи с главного экрана */}
       {overviewEditTask && (
