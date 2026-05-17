@@ -37,13 +37,6 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- Service Worker для офлайн-поддержки -->
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/sw.js").catch(() => {});
-        });
-      }
-    </script>
+    <!-- Service Worker регистрируется автоматически через vite-plugin-pwa -->
   </body>
 </html>
