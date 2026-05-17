@@ -173,18 +173,18 @@ function AppInner() {
         </div>
       )}
       {notif.foregroundNotif && (
-        <div onClick={notif.dismissForeground} style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 9999, maxWidth: 340, width: "calc(100% - 32px)", background: "linear-gradient(135deg,#1a1a3e,#2a1a4e)", border: "1px solid rgba(139,92,246,0.4)", borderRadius: 16, padding: "14px 18px", boxShadow: "0 8px 32px rgba(0,0,0,0.6)", cursor: "pointer", display: "flex", gap: 12, alignItems: "flex-start" }}>
+        <div onClick={notif.dismissForeground} style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 9999, maxWidth: 340, width: "calc(100% - 32px)", background: T.bg2, border: `1px solid ${T.purp}55`, borderRadius: 16, padding: "14px 18px", boxShadow: `0 8px 32px ${T.purp}33`, cursor: "pointer", display: "flex", gap: 12, alignItems: "flex-start" }}>
           <div style={{ fontSize: 28, flexShrink: 0 }}>🗡️</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "#e8d5ff", marginBottom: 2 }}>{notif.foregroundNotif.title}</div>
-            <div style={{ fontSize: 13, color: "rgba(232,213,255,0.7)", lineHeight: 1.4 }}>{notif.foregroundNotif.body}</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: T.text, marginBottom: 2 }}>{notif.foregroundNotif.title}</div>
+            <div style={{ fontSize: 13, color: T.sub, lineHeight: 1.4 }}>{notif.foregroundNotif.body}</div>
           </div>
-          <div style={{ color: "rgba(232,213,255,0.4)" }}>✕</div>
+          <div style={{ color: T.dim }}>✕</div>
         </div>
       )}
 
       {loginBonus && (
-        <div style={{ position: "fixed", top: 20, left: "50%", zIndex: 9000, pointerEvents: "none", animation: "bonusSlide 4.5s ease forwards", background: `linear-gradient(135deg, ${T.bg2}, #1a1540)`, border: `1px solid ${T.gold}66`, borderRadius: 20, padding: "14px 20px", display: "flex", alignItems: "center", gap: 14, boxShadow: `0 8px 32px #0009, 0 0 24px ${T.gold}33`, whiteSpace: "nowrap" }}>
+        <div style={{ position: "fixed", top: 20, left: "50%", zIndex: 9000, pointerEvents: "none", animation: "bonusSlide 4.5s ease forwards", background: `linear-gradient(135deg, ${T.bg2}, ${T.bg3})`, border: `1px solid ${T.gold}66`, borderRadius: 20, padding: "14px 20px", display: "flex", alignItems: "center", gap: 14, boxShadow: `0 4px 24px ${T.bg0}88, 0 0 24px ${T.gold}33`, whiteSpace: "nowrap" }}>
           <div style={{ fontSize: 32, flexShrink: 0 }}>
             {loginBonus.streak >= 7 ? "🔥" : loginBonus.streak >= 3 ? "✨" : "☀️"}
           </div>
@@ -192,7 +192,7 @@ function AppInner() {
             <div style={{ fontSize: 13, fontWeight: 800, color: T.gold, marginBottom: 2 }}>
               Бонус за вход · День {loginBonus.streak}
             </div>
-            <div style={{ fontSize: 20, fontWeight: 900, color: "#fff" }}>
+            <div style={{ fontSize: 20, fontWeight: 900, color: T.text }}>
               +{loginBonus.xp} XP
               {loginBonus.streak > 1 && (
                 <span style={{ fontSize: 12, fontWeight: 600, color: T.goldL, marginLeft: 8 }}>
@@ -215,7 +215,7 @@ function AppInner() {
         </div>
       )}
       {lvlUpAnim && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center", animation: "lvlGlow 3s ease forwards", background: "rgba(139,92,246,0.15)" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center", animation: "lvlGlow 3s ease forwards", background: `${T.purp}26` }}>
           <div style={{ background: T.bg1, border: `2px solid ${T.gold}`, borderRadius: 20, padding: "28px 40px", textAlign: "center", boxShadow: `0 0 60px ${T.purp}88` }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>⭐</div>
             <div style={{ fontSize: 13, color: T.sub, textTransform: "uppercase", letterSpacing: "0.1em" }}>Новый уровень</div>

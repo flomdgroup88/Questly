@@ -10,6 +10,26 @@ import { lvlOf, today } from "../utils";
  *  - xpAnim, lvlUpAnim  — для отображения анимаций
  *  - handleToggle, handleSave, handleDelete, handleShopToggle
  */
+
+// ── Тактильный отклик ─────────────────────────────────────────────
+// Приоритет: Telegram WebApp HapticFeedback → navigator.vibrate → ничего.
+// completing=true  — задача выполнена  (двойной акцентный паттерн / success)
+// completing=false — отметка снята     (мягкий одиночный тап / light)
+function haptic(completing) {
+  try {
+    const tgHaptic = window?.Telegram?.WebApp?.HapticFeedback;
+    if (tgHaptic) {
+      completing
+        ? tgHaptic.notificationOccurred("success")
+        : tgHaptic.impactOccurred("light");
+      return;
+    }
+    if (navigator?.vibrate) {
+      navigator.vibrate(completing ? [12, 8, 18] : 8);
+    }
+  } catch { /* вибрация не критична */ }
+}
+
 export function useTasks(initialTasks, initialXP) {
   const [tasks, setTasks] = useState(initialTasks);
   const [xp, setXP] = useState(initialXP);
@@ -25,6 +45,7 @@ export function useTasks(initialTasks, initialXP) {
 
         if (!t.done) {
           // Выполняем задачу
+          haptic(true);
           const newStreak = t.streakEnabled
             ? (t.streak || 0) + 1
             : (t.streak || 0);
@@ -53,6 +74,7 @@ export function useTasks(initialTasks, initialXP) {
         }
 
         // Снимаем отметку — XP не уходит в минус, уровень синхронизируем с реальным
+        haptic(false);
         setXP((prevXP) => {
           const newXP = Math.max(0, prevXP - t.xp);
           prevLvlRef.current = lvlOf(newXP);
