@@ -23,6 +23,7 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
   const [shopItems,setShopItems]=useState(existing?.shopItems??[]);
   const [shopInput,setShopInput]=useState("");
   const [priority,setPriority]=useState(existing?.priority??"normal");
+  const [note,setNote]=useState(existing?.note??"");
 
   const pickPreset=p=>{
     setCheckPresetId(p.id);
@@ -45,6 +46,7 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
       id:existing?.id??uid(),title:title.trim(),period,done:existing?.done??false,
       xp:p.xp,dueDate,recurring,recurType,streakEnabled,streak:existing?.streak??0,
       priority,
+      note:note.trim()||undefined,
       ...(hasChecklist?{
         shopItems,
         checklistIcon:checkPresetId==="custom"?(customEmoji||"📋"):checklistIcon,
@@ -81,6 +83,28 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
         {bulkMode&&!isEdit&&bulkText.trim()&&(
           <div style={{fontSize:11,color:T.teal,marginTop:6,fontWeight:600}}>✓ Будет создано задач: {bulkText.split("\n").filter(l=>l.trim()).length}</div>
         )}
+      </div>
+
+
+      <div style={{marginBottom:14}}>
+        <SectionLabel>Заметка (необязательно)</SectionLabel>
+        <textarea
+          value={note}
+          onChange={e=>setNote(e.target.value)}
+          placeholder="Дополнительные детали, ссылки, мысли…"
+          rows={2}
+          style={{
+            width:"100%",padding:"11px 14px",
+            background:T.bg0,border:`1px solid ${T.brd}`,
+            borderRadius:11,color:T.text,fontSize:14,
+            outline:"none",resize:"vertical",
+            colorScheme:T.cs,fontFamily:"inherit",
+            lineHeight:1.5,minHeight:68,
+            transition:"border-color 0.15s",
+          }}
+          onFocus={e=>e.target.style.borderColor=T.purp}
+          onBlur={e=>e.target.style.borderColor=T.brd}
+        />
       </div>
 
       <div style={{marginBottom:14}}>

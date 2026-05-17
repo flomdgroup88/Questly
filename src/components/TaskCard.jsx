@@ -82,6 +82,13 @@ export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
               </span>
             )}
           </div>
+          {task.note&&!task.done&&(
+            <div style={{
+              fontSize:12,color:T.sub,marginTop:5,lineHeight:1.45,
+              display:"-webkit-box",WebkitLineClamp:2,
+              WebkitBoxOrient:"vertical",overflow:"hidden",
+            }}>📝 {task.note}</div>
+          )}
         </div>
 
         {hasShop?(

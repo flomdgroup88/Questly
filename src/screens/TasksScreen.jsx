@@ -5,7 +5,11 @@ import { XPBar } from "../components/ui.jsx";
 import TaskCard from "../components/TaskCard.jsx";
 import TaskModal from "./TaskModal.jsx";
 
-const FILTER_TABS = [
+// Функция вместо константы: T — мутабельный синглтон, его цвета меняются при
+// переключении темы. Если захватить значения один раз на уровне модуля, после
+// смены темы табы останутся в старых цветах. Вызов при каждом рендере гарантирует
+// актуальные значения без лишних ре-рендеров — массив используется только внутри JSX.
+const getFilterTabs = () => [
   { id:"day",      label:"Сегодня", icon:"⚡", accent:T.teal     },
   { id:"tomorrow", label:"Завтра",  icon:"🌅", accent:T.sky      },
   { id:"week",     label:"Неделя",  icon:"🌊", accent:T.sky      },
@@ -38,6 +42,7 @@ export default function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopT
   const done  = useMemo(() => filtered.filter((t) => t.done).length, [filtered]);
   const total = filtered.length;
   const pct   = total > 0 ? done / total : 0;
+  const FILTER_TABS = getFilterTabs();
   const ft    = FILTER_TABS.find((x) => x.id === filter);
   const p     = filter === "tomorrow"
     ? { accent: T.sky, desc: "на завтра", xp: 15 }
