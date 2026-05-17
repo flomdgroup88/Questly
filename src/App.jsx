@@ -115,7 +115,7 @@ function AppInner() {
   const shellStyle = {
     width: "100%", maxWidth: 420, margin: "0 auto",
     background: T.bg0, minHeight: "100vh",
-    fontFamily: "'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif",
+    fontFamily: "'Nunito','Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif",
     color: T.text, display: "flex", flexDirection: "column",
   };
 
