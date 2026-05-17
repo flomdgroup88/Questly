@@ -24,6 +24,8 @@ export function useCloudSync({
   tasks,
   events,
   nickname,
+  challenges,
+  sharedGoals,
   savedLocalTime,
   onCloudLoaded,
 }) {
@@ -78,6 +80,8 @@ export function useCloudSync({
               xp: cloud.xp ?? null,
               nickname: cloud.nickname ?? null,
               userAvatar: cloud.userAvatar ?? null,
+              challenges: cloud.challenges ?? null,
+              sharedGoals: cloud.sharedGoals ?? null,
             });
             setSyncStatus("saved");
           }
@@ -117,6 +121,8 @@ export function useCloudSync({
         tasks,
         events,
         nickname,
+        challenges,
+        sharedGoals,
         _savedAt: Date.now(),
       });
 
@@ -143,8 +149,10 @@ export function useCloudSync({
 
     return () => {
       clearTimeout(syncTimerRef.current);
+      clearTimeout(maxWaitTimerRef.current);
+      maxWaitTimerRef.current = null;
     };
-  }, [xp, tasks, events, nickname]);
+  }, [xp, tasks, events, nickname, challenges, sharedGoals]);
 
   const syncIcon =
     syncStatus === "saving" ? "⏳" :

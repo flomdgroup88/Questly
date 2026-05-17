@@ -286,6 +286,64 @@ function SharedGoalDetail({ sg, onClose, onToggleItem, onAssign, onShare, onDele
   );
 }
 
+// ─── CHALLENGE CARD (top-level — стабильный тип, без remount при re-render) ──
+function ChallengeCard({ ch, myDisplayName, onOpen, onShare }) {
+  const allParts=[{name:myDisplayName,streak:ch.myStreak,isMe:true},...(ch.participants||[])];
+  const myDoneToday=ch.myHistory.includes(today());
+  return (
+    <div onClick={onOpen} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"14px 16px",marginBottom:10,cursor:"pointer"}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
+        <div style={{fontSize:32,width:48,height:48,borderRadius:12,background:T.purp+"22",border:`1px solid ${T.purp}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{ch.emoji}</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:15,fontWeight:700,color:T.text}}>{ch.title}</div>
+          {ch.desc&&<div style={{fontSize:12,color:T.sub,marginTop:2,lineHeight:1.4}}>{ch.desc}</div>}
+          <div style={{fontSize:11,color:T.dim,marginTop:3}}>{ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно"}</div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
+          {myDoneToday
+            ?<span style={{fontSize:11,fontWeight:700,color:T.teal,background:T.teal+"22",padding:"3px 9px",borderRadius:20}}>✓ сегодня</span>
+            :<span style={{fontSize:11,color:T.rose,background:T.rose+"22",padding:"3px 9px",borderRadius:20}}>сегодня</span>}
+          {ch.shareCode&&<div onClick={e=>{e.stopPropagation();onShare();}} style={{fontSize:11,color:T.sky,background:T.sky+"18",padding:"3px 9px",borderRadius:20,border:`1px solid ${T.sky}33`,cursor:"pointer",whiteSpace:"nowrap"}}>🔗 Позвать</div>}
+        </div>
+      </div>
+      <div style={{display:"flex",gap:6}}>
+        {allParts.sort((a,b)=>b.streak-a.streak).map((p,i)=>(
+          <div key={p.name} style={{flex:1,background:i===0?T.gold+"18":T.bg0,borderRadius:10,padding:"8px 6px",textAlign:"center",border:`1px solid ${i===0?T.gold+"44":T.brd}`}}>
+            <div style={{fontSize:10,color:T.sub,marginBottom:3,fontWeight:600}}>{p.name}{p.isMe?" 👤":""}</div>
+            <div style={{fontSize:16,fontWeight:900,color:"#FF6B35"}}>🔥{p.streak}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── GOAL CARD (top-level — стабильный тип) ───────────────────────
+function GoalCard({ sg, myDisplayName, onOpen }) {
+  const done=sg.items.filter(x=>x.done).length,total=sg.items.length;
+  const myDone=sg.items.filter(x=>x.doneBy===myDisplayName).length;
+  return (
+    <div onClick={onOpen} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"14px 16px",marginBottom:10,cursor:"pointer"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+        <div style={{fontSize:28,width:44,height:44,borderRadius:11,background:T.teal+"22",border:`1px solid ${T.teal}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{sg.emoji}</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:15,fontWeight:700,color:T.text}}>{sg.title}</div>
+          <div style={{fontSize:11,color:T.sub,marginTop:2}}>{sg.participants.join(" · ")}</div>
+        </div>
+        <div style={{textAlign:"right",flexShrink:0}}>
+          <div style={{fontSize:16,fontWeight:800,color:T.teal}}>{done}<span style={{fontSize:11,color:T.sub}}>/{total}</span></div>
+          <div style={{fontSize:10,color:T.sub}}>пунктов</div>
+        </div>
+      </div>
+      <XPBar progress={total>0?done/total:0} color={T.teal} height={5}/>
+      <div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
+        <div style={{fontSize:11,color:T.sub}}>{total-done} пунктов осталось</div>
+        {myDone>0&&<div style={{fontSize:11,color:T.teal,fontWeight:700}}>ты взял: {myDone} ✓</div>}
+      </div>
+    </div>
+  );
+}
+
 // ─── SOCIAL SCREEN ────────────────────────────────────────────────
 export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg, nickname, userAvatar }) {
   const [tab,setTab]=useState("challenges");
@@ -361,58 +419,6 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
   const toggleSgItem=(sgId,itemId)=>onUpdateSg(sgId,sg=>({...sg,items:sg.items.map(it=>it.id!==itemId?it:{...it,done:!it.done,doneBy:!it.done?myDisplayName:null})}));
   const assignSgItem=(sgId,itemId,name)=>onUpdateSg(sgId,sg=>({...sg,items:sg.items.map(it=>it.id!==itemId?it:{...it,assignedTo:name})}));
 
-  const ChallengeCard=({ch})=>{
-    const allParts=[{name:myDisplayName,streak:ch.myStreak,isMe:true},...ch.participants];
-    const myDoneToday=ch.myHistory.includes(today());
-    return (
-      <div onClick={()=>setDetailCh(ch)} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"14px 16px",marginBottom:10,cursor:"pointer"}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
-          <div style={{fontSize:32,width:48,height:48,borderRadius:12,background:T.purp+"22",border:`1px solid ${T.purp}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{ch.emoji}</div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:15,fontWeight:700,color:T.text}}>{ch.title}</div>
-            {ch.desc&&<div style={{fontSize:12,color:T.sub,marginTop:2,lineHeight:1.4}}>{ch.desc}</div>}
-            <div style={{fontSize:11,color:T.dim,marginTop:3}}>{ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно"}</div>
-          </div>
-          <div style={{textAlign:"right",flexShrink:0}}>
-            {myDoneToday?<span style={{fontSize:11,fontWeight:700,color:T.teal,background:T.teal+"22",padding:"3px 9px",borderRadius:20}}>✓ сегодня</span>:<span style={{fontSize:11,color:T.rose,background:T.rose+"22",padding:"3px 9px",borderRadius:20}}>сегодня</span>}
-          </div>
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          {allParts.sort((a,b)=>b.streak-a.streak).map((p,i)=>(
-            <div key={p.name} style={{flex:1,background:i===0?T.gold+"18":T.bg0,borderRadius:10,padding:"8px 6px",textAlign:"center",border:`1px solid ${i===0?T.gold+"44":T.brd}`}}>
-              <div style={{fontSize:10,color:T.sub,marginBottom:3,fontWeight:600}}>{p.name}{p.isMe?" 👤":""}</div>
-              <div style={{fontSize:16,fontWeight:900,color:"#FF6B35"}}>🔥{p.streak}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const GoalCard=({sg})=>{
-    const done=sg.items.filter(x=>x.done).length,total=sg.items.length;
-    const myDone=sg.items.filter(x=>x.doneBy===myDisplayName).length;
-    return (
-      <div onClick={()=>setDetailSg(sg)} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"14px 16px",marginBottom:10,cursor:"pointer"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-          <div style={{fontSize:28,width:44,height:44,borderRadius:11,background:T.teal+"22",border:`1px solid ${T.teal}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{sg.emoji}</div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:15,fontWeight:700,color:T.text}}>{sg.title}</div>
-            <div style={{fontSize:11,color:T.sub,marginTop:2}}>{sg.participants.join(" · ")}</div>
-          </div>
-          <div style={{textAlign:"right",flexShrink:0}}>
-            <div style={{fontSize:16,fontWeight:800,color:T.teal}}>{done}<span style={{fontSize:11,color:T.sub}}>/{total}</span></div>
-            <div style={{fontSize:10,color:T.sub}}>пунктов</div>
-          </div>
-        </div>
-        <XPBar progress={total>0?done/total:0} color={T.teal} height={5}/>
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
-          <div style={{fontSize:11,color:T.sub}}>{total-done} пунктов осталось</div>
-          {myDone>0&&<div style={{fontSize:11,color:T.teal,fontWeight:700}}>ты взял: {myDone} ✓</div>}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -428,8 +434,8 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
         <div onClick={()=>setJoin(true)} style={{padding:"9px 14px",borderRadius:11,background:T.sky+"22",color:T.sky,fontWeight:700,fontSize:13,border:`1px solid ${T.sky}44`,cursor:"pointer",whiteSpace:"nowrap"}}>🔗 Войти</div>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"0 16px",WebkitOverflowScrolling:"touch"}}>
-        {tab==="challenges"&&(challenges.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🏆</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет соревнований</div><div style={{fontSize:13,marginTop:6}}>Создай серию и поделись с другом</div></div>:challenges.map(ch=><ChallengeCard key={ch.id} ch={ch}/>))}
-        {tab==="goals"&&(sharedGoals.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🎯</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет общих целей</div><div style={{fontSize:13,marginTop:6}}>Поделись списком задач с другом</div></div>:sharedGoals.map(sg=><GoalCard key={sg.id} sg={sg}/>))}
+        {tab==="challenges"&&(challenges.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🏆</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет соревнований</div><div style={{fontSize:13,marginTop:6}}>Создай серию и поделись с другом</div></div>:challenges.map(ch=><ChallengeCard key={ch.id} ch={ch} myDisplayName={myDisplayName} onOpen={()=>setDetailCh(ch)} onShare={()=>setShare({code:ch.shareCode,title:ch.title})}/>))}
+        {tab==="goals"&&(sharedGoals.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🎯</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет общих целей</div><div style={{fontSize:13,marginTop:6}}>Поделись списком задач с другом</div></div>:sharedGoals.map(sg=><GoalCard key={sg.id} sg={sg} myDisplayName={myDisplayName} onOpen={()=>setDetailSg(sg)}/>))}
         <div style={{height:20}}/>
       </div>
       {showNewCh&&<NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch);setNewCh(false);}} nickname={nickname}/>}

@@ -7,7 +7,36 @@ const tg = typeof window !== "undefined" && window.Telegram?.WebApp;
 export default function ShareSheet({ code, title, onClose }) {
   const [copied,setCopied]=useState(false);
   const link=`https://t.me/questlytaskbot?start=${code}`;
-  const copy=()=>{navigator.clipboard?.writeText(link).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
+  const shareText=`Присоединяйся к квесту «${title}»! Код: ${code}`;
+
+  const copy=()=>{
+    navigator.clipboard?.writeText(link).catch(()=>{});
+    setCopied(true);
+    setTimeout(()=>setCopied(false),2000);
+  };
+
+  // Web Share API — нативный диалог (работает и в Telegram WebApp)
+  const nativeShare=async()=>{
+    try{
+      await navigator.share({title:`Квест: ${title}`,text:shareText,url:link});
+      onClose();
+    }catch(e){
+      if(e?.name!=="AbortError") copy(); // fallback на копирование
+    }
+  };
+
+  // Telegram-нативный шаринг — открывает диалог отправки сообщения
+  const tgShare=()=>{
+    if(tg?.openTelegramLink){
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`);
+    }else if(tg?.switchInlineQuery){
+      tg.switchInlineQuery(shareText,["users","groups"]);
+    }
+    onClose();
+  };
+
+  const canNativeShare=typeof navigator!=="undefined"&&!!navigator.share;
+
   return (
     <ModalOverlay onClose={onClose}>
       <div style={{textAlign:"center",marginBottom:20}}>
@@ -19,12 +48,18 @@ export default function ShareSheet({ code, title, onClose }) {
         <div style={{fontSize:11,color:T.sub,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.08em"}}>Код для друга</div>
         <div style={{fontSize:28,fontWeight:900,color:T.gold,letterSpacing:"0.15em",textAlign:"center"}}>{code}</div>
       </div>
-      <div style={{background:T.bg0,borderRadius:12,padding:"12px 14px",marginBottom:16,border:`1px solid ${T.brd}`,wordBreak:"break-all",fontSize:12,color:T.sub}}>{link}</div>
-      <div style={{display:"flex",gap:10}}>
-        <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Закрыть</Btn>
-        <Btn variant="teal" onClick={copy} style={{flex:2}}>{copied?"✓ Скопировано!":"📋 Скопировать ссылку"}</Btn>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {tg
+          ?<Btn variant="primary" onClick={tgShare}>✈️ Отправить в Telegram</Btn>
+          :canNativeShare
+            ?<Btn variant="primary" onClick={nativeShare}>↗ Поделиться</Btn>
+            :<Btn variant="teal" onClick={copy}>{copied?"✓ Скопировано!":"📋 Скопировать ссылку"}</Btn>
+        }
+        {(tg||canNativeShare)&&(
+          <Btn variant="ghost" onClick={copy}>{copied?"✓ Скопировано!":"📋 Скопировать ссылку"}</Btn>
+        )}
+        <Btn variant="ghost" onClick={onClose}>Закрыть</Btn>
       </div>
-      {tg&&<div style={{marginTop:10}}><Btn variant="primary" onClick={()=>{tg.switchInlineQuery&&tg.switchInlineQuery(`Присоединяйся к квесту «${title}» — код: ${code}`,["users","groups"]);onClose();}}>✈️ Отправить в Telegram</Btn></div>}
     </ModalOverlay>
   );
 }

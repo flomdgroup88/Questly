@@ -346,12 +346,14 @@ export default function App() {
 
   // useCallback гарантирует стабильную ссылку — useCloudSync не перезапускает
   // подписку на onAuthStateChanged при каждом рендере App.
-  const handleCloudLoaded = useCallback(({ tasks: t, events: e, xp: x, nickname: n, userAvatar: av }) => {
+  const handleCloudLoaded = useCallback(({ tasks: t, events: e, xp: x, nickname: n, userAvatar: av, challenges: ch, sharedGoals: sg }) => {
     if (t)          setTasks(t);
     if (e)          setEvts(e);
     if (x !== null) setXP(x);
     if (n)          setNickname(n);
     if (av)         setUserAvatar(av);
+    if (ch)         setChallenges(ch);
+    if (sg)         setSharedGoals(sg);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { syncStatus, syncIcon, isLoading, showOfflineToast } = useCloudSync({
@@ -359,6 +361,8 @@ export default function App() {
     tasks,
     events,
     nickname,
+    challenges,
+    sharedGoals,
     savedLocalTime: saved?._savedAt ?? 0,
     onCloudLoaded: handleCloudLoaded,
   });

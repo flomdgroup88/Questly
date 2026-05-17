@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { T } from "../theme.js";
 import { PERIODS, RANKS, RANK_ICONS } from "../constants.js";
 import { lvlOf, progOf, nextXP, today } from "../utils.js";
@@ -30,7 +30,7 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
   const completedOnSunday=tasks.some(t=>(t.doneHistory||[]).some(d=>new Date(d).getDay()===0));
   const activeDays=new Set(tasks.flatMap(t=>t.doneHistory||[])).size;
 
-  const ACHIEVEMENTS=[
+  const ACHIEVEMENTS=useMemo(()=>[
     // ── Задачи ──────────────────────────────────────────
     {icon:"⚡",label:"Первый шаг",        desc:"Выполни первую задачу",          done:completed>=1,   cat:"tasks"},
     {icon:"🔥",label:"Пятёрка",           desc:"Выполни 5 задач",                done:completed>=5,   cat:"tasks"},
@@ -94,7 +94,8 @@ export default function ProfileScreen({ xp, tasks, events, nickname, onSetNickna
     {icon:"🏆",label:"Чемпион",          desc:"Серия 60 дней",                  done:bestStreak>=60, cat:"streak"},
     {icon:"💎",label:"Бриллиант",        desc:"Серия 200 дней",                 done:bestStreak>=200,cat:"streak"},
     {icon:"🧬",label:"ДНК продуктивности",desc:"Серия 500 дней",                done:bestStreak>=500,cat:"streak"},
-  ];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ],[completed,total,bestStreak,hasShopTask,shopItemsDone,allPeriodsCovered,perfectDay,completedOnSunday,activeDays,level,tasks,events]);
 
   const VISIBLE_ACHIEVEMENTS = 8;
   const [showAllAchievements, setShowAllAchievements] = useState(false);
