@@ -20,5 +20,11 @@ service cloud.firestore {
     match /sharedGoals/{shareCode} {
       allow read, write: if true;
     }
+
+    // ── Публичные профили для поиска по никнейму ──────────────────
+    match /userProfiles/{nickname} {
+      allow read: if true;                  // поиск открыт всем
+      allow write: if true;                 // пишет только сам пользователь (Telegram/anon)
+    }
   }
 }

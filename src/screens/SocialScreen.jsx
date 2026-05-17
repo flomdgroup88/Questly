@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { T } from "../theme.js";
 import { today, uid, mkCode } from "../utils.js";
 import { ModalOverlay, SectionLabel, StyledInput, RecurPicker, Btn, XPBar } from "../components/ui.jsx";
 import ShareSheet from "../components/ShareSheet.jsx";
-import { cloudSave, cloudFind, cloudAddParticipant, cloudSubscribeParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants } from "../firebase.js";
+import { cloudSave, cloudFind, cloudAddParticipant, cloudSubscribeParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants,
+  cloudPublishProfile, cloudFindByNickname, cloudGetFriends, cloudAddFriend, cloudRemoveFriend, cloudSubscribeFriendProfile,
+  initUserSync } from "../firebase.js";
 
 // ─── NEW CHALLENGE MODAL ──────────────────────────────────────────
 function NewChallengeModal({ onClose, onCreate, nickname }) {
@@ -344,6 +346,268 @@ function GoalCard({ sg, myDisplayName, onOpen }) {
   );
 }
 
+// ─── ADD FRIEND MODAL ────────────────────────────────────────────
+function AddFriendModal({ onClose, onAdd, myUserKey, myNickname }) {
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState(null);
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const debounceRef = useRef(null);
+
+  const search = async (q) => {
+    const trimmed = q.trim();
+    if (!trimmed || trimmed.toLowerCase() === myNickname?.toLowerCase()) {
+      setResult(null); setErr(""); return;
+    }
+    setLoading(true); setErr(""); setResult(null);
+    try {
+      const found = await cloudFindByNickname(trimmed);
+      if (found) { setResult(found); setErr(""); }
+      else setErr("Пользователь не найден");
+    } catch { setErr("Ошибка соединения"); }
+    finally { setLoading(false); }
+  };
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setQuery(val); setResult(null); setErr("");
+    clearTimeout(debounceRef.current);
+    if (val.trim().length >= 2) {
+      debounceRef.current = setTimeout(() => search(val), 600);
+    }
+  };
+
+  const add = async () => {
+    if (!result || adding) return;
+    setAdding(true);
+    await onAdd({ userKey: result.userKey, nickname: result.nickname, avatar: result.avatar, topChallenges: result.topChallenges || [] });
+    onClose();
+  };
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <h3 style={{margin:"0 0 4px",fontSize:18,fontWeight:800,color:T.sky}}>👥 Добавить друга</h3>
+      <p style={{margin:"0 0 18px",fontSize:13,color:T.sub}}>Введи никнейм друга, чтобы найти его</p>
+      <div style={{marginBottom:14}}>
+        <StyledInput
+          value={query}
+          onChange={handleChange}
+          placeholder="Никнейм друга…"
+        />
+        <div style={{textAlign:"center",marginTop:8,fontSize:12,color:T.sub}}>
+          {loading ? "🔍 Ищем…" : query.length < 2 ? "Введи хотя бы 2 символа" : ""}
+        </div>
+      </div>
+      {err && <div style={{color:T.rose,fontSize:13,marginBottom:12,textAlign:"center"}}>{err}</div>}
+      {result && (
+        <div style={{background:T.bg0,borderRadius:13,border:`2px solid ${T.sky}66`,padding:"16px",marginBottom:16,display:"flex",alignItems:"center",gap:14}}>
+          <div style={{fontSize:36,width:50,height:50,borderRadius:14,background:T.sky+"22",border:`1px solid ${T.sky}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{result.avatar||"👤"}</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:16,fontWeight:800,color:T.text,marginBottom:4}}>{result.nickname}</div>
+            {result.topChallenges?.length > 0 && (
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {result.topChallenges.map((c,i) => (
+                  <div key={i} style={{fontSize:11,color:T.sub,background:T.bg2,borderRadius:8,padding:"3px 8px",border:`1px solid ${T.brd}`}}>
+                    {c.emoji} {c.title} · 🔥{c.streak}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <div style={{display:"flex",gap:10}}>
+        <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Отмена</Btn>
+        <Btn variant="primary" onClick={add} style={{flex:2}} disabled={!result||adding}>
+          {adding ? "⏳ Добавляем…" : "Добавить друга 👥"}
+        </Btn>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─── FRIEND CARD ──────────────────────────────────────────────────
+function FriendCard({ friend, onRemove, onInvite, challenges }) {
+  const [freshProfile, setFreshProfile] = useState(null);
+  const [removing, setRemoving] = useState(false);
+
+  // Подписываемся на свежий профиль
+  useEffect(() => {
+    if (!friend.nickname) return;
+    const unsub = cloudSubscribeFriendProfile(friend.nickname, (p) => setFreshProfile(p));
+    return unsub;
+  }, [friend.nickname]);
+
+  const profile = freshProfile || friend;
+  const topChallenges = profile.topChallenges || [];
+
+  return (
+    <div style={{background:T.bg2,borderRadius:16,border:`1px solid ${T.brd}`,padding:"16px",marginBottom:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom: topChallenges.length > 0 ? 12 : 0}}>
+        <div style={{fontSize:32,width:50,height:50,borderRadius:14,background:T.sky+"22",border:`1px solid ${T.sky}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          {profile.avatar||"👤"}
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:16,fontWeight:800,color:T.text}}>{profile.nickname}</div>
+          <div style={{fontSize:11,color:T.teal,marginTop:2,fontWeight:600}}>
+            {topChallenges.length > 0
+              ? `${topChallenges.length} соревнован${topChallenges.length === 1 ? "ие" : "ия"}`
+              : "Пока нет соревнований"}
+          </div>
+        </div>
+        <div
+          onClick={async () => {
+            if (removing) return; setRemoving(true);
+            await onRemove(friend.userKey); setRemoving(false);
+          }}
+          style={{fontSize:12,padding:"5px 10px",borderRadius:20,background:T.rose+"22",color:T.rose,border:`1px solid ${T.rose}44`,cursor:"pointer",flexShrink:0,opacity:removing?0.5:1}}
+        >
+          Удалить
+        </div>
+      </div>
+
+      {topChallenges.length > 0 && (
+        <div style={{display:"flex",flexDirection:"column",gap:7}}>
+          {topChallenges.map((c, i) => (
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:T.bg0,borderRadius:11,border:`1px solid ${T.brd}`}}>
+              <div style={{fontSize:20,width:28,textAlign:"center",flexShrink:0}}>{c.emoji}</div>
+              <div style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{c.title}</div>
+              <div style={{fontSize:15,fontWeight:900,color:"#FF6B35",flexShrink:0}}>🔥 {c.streak}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {challenges.length > 0 && (
+        <div style={{marginTop:12}}>
+          <div style={{fontSize:11,color:T.sub,marginBottom:7,fontWeight:600}}>ПОЗВАТЬ В МОЁ СОРЕВНОВАНИЕ:</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {challenges.map(ch => (
+              <div
+                key={ch.id}
+                onClick={() => onInvite(ch)}
+                style={{fontSize:12,padding:"5px 11px",borderRadius:20,background:T.purp+"22",color:T.purpL,border:`1px solid ${T.purp}44`,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}
+              >
+                {ch.emoji} {ch.title} · 🔗
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── FRIENDS TAB ──────────────────────────────────────────────────
+function FriendsTab({ nickname, userAvatar, challenges, onShare }) {
+  const [friends, setFriends] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [userKey, setUserKey] = useState(null);
+
+  // Получаем userKey один раз
+  useEffect(() => {
+    initUserSync().then(key => { if (key) setUserKey(key); });
+  }, []);
+
+  // Публикуем свой профиль и загружаем друзей
+  useEffect(() => {
+    if (!userKey || !nickname) { setLoading(false); return; }
+    cloudPublishProfile(userKey, nickname, userAvatar, challenges);
+    cloudGetFriends(userKey).then(list => { setFriends(list); setLoading(false); });
+  }, [userKey, nickname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Обновляем профиль при изменении соревнований
+  useEffect(() => {
+    if (userKey && nickname) cloudPublishProfile(userKey, nickname, userAvatar, challenges);
+  }, [challenges, userKey, nickname, userAvatar]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAdd = async (friendData) => {
+    if (!userKey) return;
+    const ok = await cloudAddFriend(userKey, friendData);
+    if (ok) setFriends(p => [...p.filter(f => f.userKey !== friendData.userKey), friendData]);
+  };
+
+  const handleRemove = async (friendKey) => {
+    if (!userKey) return;
+    await cloudRemoveFriend(userKey, friendKey);
+    setFriends(p => p.filter(f => f.userKey !== friendKey));
+  };
+
+  if (loading) return (
+    <div style={{textAlign:"center",padding:"60px 0",color:T.dim}}>
+      <div style={{fontSize:32,marginBottom:10,animation:"sparkle 1.5s linear infinite"}}>⚡</div>
+      <div style={{fontSize:13,color:T.sub}}>Загружаем друзей…</div>
+    </div>
+  );
+
+  if (!nickname) return (
+    <div style={{textAlign:"center",padding:"60px 24px",color:T.dim}}>
+      <div style={{fontSize:44,marginBottom:12}}>👥</div>
+      <div style={{fontSize:15,fontWeight:700,color:T.sub,marginBottom:8}}>Сначала задай никнейм</div>
+      <div style={{fontSize:13,color:T.dim}}>Он нужен, чтобы друзья могли найти тебя</div>
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Моя визитка */}
+      <div style={{background:T.bg2,borderRadius:16,border:`1px solid ${T.brd}`,padding:"16px",marginBottom:16,display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:32,width:50,height:50,borderRadius:14,background:T.purp+"22",border:`1px solid ${T.purp}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          {userAvatar||"🧙"}
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:11,color:T.sub,fontWeight:600,marginBottom:3}}>МОЙ НИКНЕЙМ ДЛЯ ПОИСКА</div>
+          <div style={{fontSize:18,fontWeight:900,color:T.purpL}}>{nickname}</div>
+        </div>
+        <div
+          onClick={() => setShowAdd(true)}
+          style={{padding:"8px 14px",borderRadius:12,background:`linear-gradient(135deg,${T.sky},${T.teal})`,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",flexShrink:0}}
+        >
+          + Добавить
+        </div>
+      </div>
+
+      {friends.length === 0 ? (
+        <div style={{textAlign:"center",padding:"48px 24px",color:T.dim}}>
+          <div style={{fontSize:44,marginBottom:12}}>🤝</div>
+          <div style={{fontSize:15,fontWeight:700,color:T.sub,marginBottom:8}}>Список друзей пуст</div>
+          <div style={{fontSize:13,marginBottom:20}}>Добавь друга по никнейму — больше не нужно вводить коды</div>
+          <div
+            onClick={() => setShowAdd(true)}
+            style={{display:"inline-block",padding:"10px 24px",borderRadius:14,background:`linear-gradient(135deg,${T.sky},${T.teal})`,color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}
+          >
+            👥 Найти друга
+          </div>
+        </div>
+      ) : (
+        <>
+          <SectionLabel>ДРУЗЬЯ ({friends.length})</SectionLabel>
+          {friends.map(f => (
+            <FriendCard
+              key={f.userKey}
+              friend={f}
+              onRemove={handleRemove}
+              onInvite={(ch) => onShare({ code: ch.shareCode, title: ch.title })}
+              challenges={challenges}
+            />
+          ))}
+        </>
+      )}
+
+      {showAdd && (
+        <AddFriendModal
+          onClose={() => setShowAdd(false)}
+          onAdd={handleAdd}
+          myUserKey={userKey}
+          myNickname={nickname}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── SOCIAL SCREEN ────────────────────────────────────────────────
 export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg, nickname, userAvatar }) {
   const [tab,setTab]=useState("challenges");
@@ -424,18 +688,21 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{padding:"10px 16px 8px",flexShrink:0}}>
         <div style={{display:"flex",background:T.bg2,borderRadius:13,padding:4,border:`1px solid ${T.brd}`,gap:4}}>
-          {[["challenges","🏆 Соревнования"],["goals","🎯 Общие цели"]].map(([id,label])=>(
-            <div key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"8px 0",borderRadius:9,cursor:"pointer",textAlign:"center",fontSize:13,fontWeight:700,background:tab===id?T.purp:"transparent",color:tab===id?"#fff":T.sub,transition:"all 0.2s"}}>{label}</div>
+          {[["challenges","🏆 Бои"],["goals","🎯 Цели"],["friends","👥 Друзья"]].map(([id,label])=>(
+            <div key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"8px 0",borderRadius:9,cursor:"pointer",textAlign:"center",fontSize:12,fontWeight:700,background:tab===id?T.purp:"transparent",color:tab===id?"#fff":T.sub,transition:"all 0.2s"}}>{label}</div>
           ))}
         </div>
       </div>
       <div style={{display:"flex",gap:8,padding:"0 16px 10px",flexShrink:0}}>
-        <div onClick={()=>tab==="challenges"?setNewCh(true):setNewSg(true)} style={{flex:1,padding:"9px 0",borderRadius:11,background:`linear-gradient(135deg,${T.purp},${T.gold})`,color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",cursor:"pointer"}}>+ {tab==="challenges"?"Создать":"Новая цель"}</div>
-        <div onClick={()=>setJoin(true)} style={{padding:"9px 14px",borderRadius:11,background:T.sky+"22",color:T.sky,fontWeight:700,fontSize:13,border:`1px solid ${T.sky}44`,cursor:"pointer",whiteSpace:"nowrap"}}>🔗 Войти</div>
+        {tab !== "friends" && <>
+          <div onClick={()=>tab==="challenges"?setNewCh(true):setNewSg(true)} style={{flex:1,padding:"9px 0",borderRadius:11,background:`linear-gradient(135deg,${T.purp},${T.gold})`,color:"#fff",fontWeight:700,fontSize:13,textAlign:"center",cursor:"pointer"}}>+ {tab==="challenges"?"Создать":"Новая цель"}</div>
+          <div onClick={()=>setJoin(true)} style={{padding:"9px 14px",borderRadius:11,background:T.sky+"22",color:T.sky,fontWeight:700,fontSize:13,border:`1px solid ${T.sky}44`,cursor:"pointer",whiteSpace:"nowrap"}}>🔗 Войти</div>
+        </>}
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"0 16px",WebkitOverflowScrolling:"touch"}}>
         {tab==="challenges"&&(challenges.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🏆</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет соревнований</div><div style={{fontSize:13,marginTop:6}}>Создай серию и поделись с другом</div></div>:challenges.map(ch=><ChallengeCard key={ch.id} ch={ch} myDisplayName={myDisplayName} onOpen={()=>setDetailCh(ch)} onShare={()=>setShare({code:ch.shareCode,title:ch.title})}/>))}
         {tab==="goals"&&(sharedGoals.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🎯</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет общих целей</div><div style={{fontSize:13,marginTop:6}}>Поделись списком задач с другом</div></div>:sharedGoals.map(sg=><GoalCard key={sg.id} sg={sg} myDisplayName={myDisplayName} onOpen={()=>setDetailSg(sg)}/>))}
+        {tab==="friends"&&<FriendsTab nickname={nickname} userAvatar={userAvatar} challenges={challenges} onShare={setShare}/>}
         <div style={{height:20}}/>
       </div>
       {showNewCh&&<NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch);setNewCh(false);}} nickname={nickname}/>}

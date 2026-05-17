@@ -37,12 +37,15 @@ export function NicknameGateModal({ onDone, onClose }: Props) {
     <div style={{
       position: "fixed", inset: 0, zIndex: 500,
       background: "rgba(7,7,28,0.88)", backdropFilter: "blur(4px)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+      display: "flex", alignItems: "flex-start", justifyContent: "center",
+      padding: "24px 24px 0",
+      overflowY: "auto",
     }}>
       <div style={{
         background: T.bg1, borderRadius: 20, padding: "28px 24px",
         width: "100%", maxWidth: 340, border: `1px solid ${T.brd}`,
         boxShadow: `0 0 40px ${T.purp}33`,
+        marginBottom: 24, flexShrink: 0,
       }}>
         <div style={{ fontSize: 52, textAlign: "center", marginBottom: 10, lineHeight: 1 }}>{avatar}</div>
         <div style={{ fontSize: 17, fontWeight: 800, color: T.purpL, textAlign: "center", marginBottom: 4 }}>

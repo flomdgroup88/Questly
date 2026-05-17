@@ -292,3 +292,93 @@ export function onForegroundMessage(callback) {
   if (!messaging) return () => {};
   return onMessage(messaging, callback);
 }
+
+// ─── FRIENDS: Публичный профиль ────────────────────────────────────
+// Публикует/обновляет профиль пользователя, чтобы друзья могли найти его по никнейму.
+// Ключ документа — lowercase nickname, чтобы поиск был за O(1).
+export async function cloudPublishProfile(userKey, nickname, avatar, challenges = []) {
+  if (!userKey || !nickname) return false;
+  try {
+    await setDoc(doc(db, "userProfiles", nickname.toLowerCase()), {
+      userKey,
+      nickname,
+      avatar: avatar || "👤",
+      topChallenges: challenges.slice(0, 3).map(c => ({
+        emoji: c.emoji || "🏆",
+        title: c.title,
+        streak: c.myStreak || 0,
+      })),
+      updatedAt: Date.now(),
+    });
+    return true;
+  } catch (e) {
+    console.warn("cloudPublishProfile error:", e);
+    return false;
+  }
+}
+
+// Ищет пользователя по точному никнейму (регистронезависимо)
+export async function cloudFindByNickname(nickname) {
+  if (!nickname) return null;
+  try {
+    const snap = await getDoc(doc(db, "userProfiles", nickname.toLowerCase().trim()));
+    return snap.exists() ? snap.data() : null;
+  } catch (e) {
+    console.warn("cloudFindByNickname error:", e);
+    return null;
+  }
+}
+
+// Возвращает список друзей из userData/{userKey}.friends
+export async function cloudGetFriends(userKey) {
+  if (!userKey) return [];
+  try {
+    const snap = await getDoc(doc(db, "userData", userKey));
+    return snap.exists() ? (snap.data().friends || []) : [];
+  } catch (e) {
+    console.warn("cloudGetFriends error:", e);
+    return [];
+  }
+}
+
+// Добавляет друга (атомарно через merge)
+export async function cloudAddFriend(userKey, friendData) {
+  if (!userKey) return false;
+  try {
+    const snap = await getDoc(doc(db, "userData", userKey));
+    const existing = snap.exists() ? (snap.data().friends || []) : [];
+    if (existing.some(f => f.userKey === friendData.userKey)) return true; // уже есть
+    await setDoc(doc(db, "userData", userKey), {
+      friends: [...existing, { ...friendData, addedAt: Date.now() }],
+    }, { merge: true });
+    return true;
+  } catch (e) {
+    console.warn("cloudAddFriend error:", e);
+    return false;
+  }
+}
+
+// Удаляет друга из списка
+export async function cloudRemoveFriend(userKey, friendKey) {
+  if (!userKey) return false;
+  try {
+    const snap = await getDoc(doc(db, "userData", userKey));
+    const existing = snap.exists() ? (snap.data().friends || []) : [];
+    await setDoc(doc(db, "userData", userKey), {
+      friends: existing.filter(f => f.userKey !== friendKey),
+    }, { merge: true });
+    return true;
+  } catch (e) {
+    console.warn("cloudRemoveFriend error:", e);
+    return false;
+  }
+}
+
+// Подписка на свежий профиль друга в реальном времени
+export function cloudSubscribeFriendProfile(nickname, callback) {
+  const ref = doc(db, "userProfiles", nickname.toLowerCase());
+  return onSnapshot(ref,
+    (snap) => { if (snap.exists()) callback(snap.data()); },
+    (err)  => console.warn("cloudSubscribeFriendProfile error:", err)
+  );
+}
