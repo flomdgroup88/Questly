@@ -296,13 +296,14 @@ export function onForegroundMessage(callback) {
 // ─── FRIENDS: Публичный профиль ────────────────────────────────────
 // Публикует/обновляет профиль пользователя, чтобы друзья могли найти его по никнейму.
 // Ключ документа — lowercase nickname, чтобы поиск был за O(1).
-export async function cloudPublishProfile(userKey, nickname, avatar, challenges = []) {
+export async function cloudPublishProfile(userKey, nickname, avatar, challenges = [], xp = 0) {
   if (!userKey || !nickname) return false;
   try {
     await setDoc(doc(db, "userProfiles", nickname.toLowerCase()), {
       userKey,
       nickname,
       avatar: avatar || "👤",
+      xp: xp || 0,
       topChallenges: challenges.slice(0, 3).map(c => ({
         emoji: c.emoji || "🏆",
         title: c.title,

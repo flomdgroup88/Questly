@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { T } from "../theme.js";
-import { PERIODS } from "../constants.js";
+import { PERIODS, PRIORITIES } from "../constants.js";
 import { fmtDate, today, daysLeft } from "../utils";
 import { PeriodBadge } from "./ui.jsx";
 
 export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
   const p=PERIODS.find(x=>x.id===task.period);
+  const pr=PRIORITIES.find(x=>x.id===(task.priority??"normal"))||PRIORITIES[0];
   const [flash,setFlash]=useState(false);
   const [shopOpen,setShopOpen]=useState(false);
 
@@ -17,6 +18,7 @@ export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
 
   const hasShop=task.shopItems&&task.shopItems.length>0;
   const shopDone=hasShop?task.shopItems.filter(i=>i.done).length:0;
+  const hasStripe=pr.id!=="normal";
 
   return (
     <div style={{marginBottom:8}}>
@@ -26,7 +28,12 @@ export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
         borderRadius:shopOpen?"13px 13px 0 0":13,padding:"13px 14px",
         display:"flex",alignItems:"center",gap:12,
         transition:"all 0.3s ease",opacity:task.done?0.6:1,cursor:"pointer",
+        position:"relative",overflow:"hidden",
       }}>
+        {/* Priority stripe */}
+        {hasStripe&&!task.done&&(
+          <div style={{position:"absolute",left:0,top:0,bottom:0,width:4,background:pr.stripe,borderRadius:"13px 0 0 13px",transition:"opacity 0.2s"}}/>
+        )}
         <div onClick={handleCheck} style={{
           width:30,height:30,borderRadius:"50%",
           border:`2.5px solid ${task.done?p.accent:T.dim}`,
@@ -35,6 +42,7 @@ export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
           display:"flex",alignItems:"center",justifyContent:"center",
           transition:"all 0.25s cubic-bezier(.34,1.56,.64,1)",
           boxShadow:task.done?`0 0 10px ${p.accent}66`:"none",
+          marginLeft:hasStripe&&!task.done?4:0,
         }}>
           {task.done&&<span style={{fontSize:15,color:"#000",fontWeight:900}}>✓</span>}
         </div>
@@ -49,6 +57,9 @@ export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <PeriodBadge period={task.period} small/>
             <span style={{fontSize:11,color:T.gold,fontWeight:700}}>+{task.xp} XP</span>
+            {hasStripe&&!task.done&&(
+              <span style={{fontSize:10,fontWeight:800,color:pr.stripe,background:pr.stripe+"22",border:`1px solid ${pr.stripe}44`,padding:"1px 7px",borderRadius:20}}>{pr.icon} {pr.label}</span>
+            )}
             {task.recurring&&<span style={{fontSize:10,color:T.dim}}>🔄</span>}
             {task.streakEnabled&&task.streak>0&&(
               <span style={{fontSize:11,fontWeight:800,color:"#FF6B35",background:"#FF6B3522",border:"1px solid #FF6B3544",padding:"1px 7px",borderRadius:20,display:"flex",alignItems:"center",gap:3}}>🔥 {task.streak}</span>

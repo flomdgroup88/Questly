@@ -146,6 +146,13 @@ export const EVENT_TYPES = [
   },
 ];
 
+// ─── PRIORITIES ───────────────────────────────────────────────────
+export const PRIORITIES = [
+  { id: "normal",    label: "Обычная",  icon: "–",  color: "transparent", stripe: "transparent"  },
+  { id: "important", label: "Важная",   icon: "★",  color: "#F5A623",     stripe: "#F5A623"      },
+  { id: "urgent",    label: "Срочная",  icon: "!!!", color: "#FF4D6D",     stripe: "#FF4D6D"      },
+];
+
 // ─── CHECKLIST PRESETS ────────────────────────────────────────────
 export const CHECKLIST_PRESETS = [
   { id:"shop",   icon:"🛒", label:"Покупки"  },

@@ -111,7 +111,7 @@ export function StyledInput({ value, onChange, placeholder, type="text", autoFoc
         width:"100%",padding:"11px 14px",background:T.bg0,
         border:`1px solid ${focused?T.purp:T.brd}`,borderRadius:11,
         color:T.text,fontSize:15,outline:"none",
-        transition:"border-color 0.15s",colorScheme:"dark",
+        transition:"border-color 0.15s",colorScheme:T.cs,
       }}/>
   );
 }
