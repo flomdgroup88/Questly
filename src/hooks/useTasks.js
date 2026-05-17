@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { lvlOf, today } from "../utils.js";
+import { lvlOf, today } from "../utils";
 
 /**
  * Хук управляет состоянием задач, XP и связанными анимациями.

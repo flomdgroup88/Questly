@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { T } from "../theme.js";
 import { PERIODS, CHECKLIST_PRESETS } from "../constants.js";
-import { uid, defaultDueForPeriod, today } from "../utils.js";
+import { uid, defaultDueForPeriod, today } from "../utils";
 import { ModalOverlay, SectionLabel, StyledInput, Toggle, RecurPicker, Btn } from "../components/ui.jsx";
 
 export default function TaskModal({ onClose, onSave, onDelete, existing=null, initialDate=null, initialPeriod=null }) {

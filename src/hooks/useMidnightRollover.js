@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { autoRollover, spawnRecurring, today, msUntilMoscowMidnight } from "../utils.js";
+import { autoRollover, spawnRecurring, today, msUntilMoscowMidnight } from "../utils";
 
 /**
  * Хук автоматически переносит незавершённые задачи ровно в 00:00 по Москве.

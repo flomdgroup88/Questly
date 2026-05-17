@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { T } from "../theme.js";
 import { PERIODS, RANKS, RANK_ICONS } from "../constants.js";
-import { lvlOf, progOf, nextXP, today } from "../utils.js";
+import { lvlOf, progOf, nextXP, today } from "../utils";
 import { XPBar } from "../components/ui.jsx";
 
 export default function ProfileScreen({ xp, tasks, events, challenges = [], nickname, onSetNickname, userAvatar, onSetAvatar, syncStatus, onImport, onLogout, notifEnabled, reminderTime, permissionState, notifSaving, onEnableNotif, onDisableNotif, onUpdateReminderTime }) {

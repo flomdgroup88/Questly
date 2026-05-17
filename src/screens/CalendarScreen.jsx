@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { T } from "../theme.js";
 import { MONTHS_RU, WDAYS, EVENT_TYPES } from "../constants.js";
-import { today, fmtDate } from "../utils.js";
+import { today, fmtDate } from "../utils";
 import { PeriodBadge } from "../components/ui.jsx";
 import EventModal from "./EventModal.jsx";
 

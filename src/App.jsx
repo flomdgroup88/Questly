@@ -15,7 +15,7 @@
 import { useCallback, useEffect } from "react";
 import { T }                 from "./theme.js";
 import { RANKS, RANK_ICONS } from "./constants.js";
-import { lvlOf, progOf, loadState } from "./utils.js";
+import { lvlOf, progOf, loadState } from "./utils";
 import { initUserSync, cloudPublishProfile } from "./firebase.js";
 import { XPBar }             from "./components/ui.jsx";
 import { ErrorBoundary }     from "./components/ErrorBoundary";

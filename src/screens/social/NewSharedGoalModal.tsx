@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { T } from "../../theme.js";
-import { today, uid, mkCode } from "../../utils.js";
+import { today, uid, mkCode } from "../../utils";
 import { ModalOverlay, SectionLabel, StyledInput, Btn } from "../../components/ui.jsx";
 import { useUser } from "../../context/UserContext.js";
 import type { SharedGoal, SharedGoalItem } from "../../types.js";

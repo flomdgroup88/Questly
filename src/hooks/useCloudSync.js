@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, cloudSaveUserData, cloudLoadUserData, initUserSync } from "../firebase.js";
-import { autoRollover, spawnRecurring, today } from "../utils.js";
+import { autoRollover, spawnRecurring, today } from "../utils";
 
 const CLOUD_DEBOUNCE_MS = 4000;
 const CLOUD_MAX_WAIT_MS = 20000;

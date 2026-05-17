@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { T } from "../theme.js";
 import { EVENT_TYPES } from "../constants.js";
-import { uid, today, fmtDate } from "../utils.js";
+import { uid, today, fmtDate } from "../utils";
 import { ModalOverlay, SectionLabel, StyledInput, Toggle, RecurPicker, Btn } from "../components/ui.jsx";
 
 export default function EventModal({ onClose, onCreate, onUpdate, onDelete, defaultDate, existing }) {

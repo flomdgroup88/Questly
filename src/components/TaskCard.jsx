@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { T } from "../theme.js";
 import { PERIODS } from "../constants.js";
-import { fmtDate, today, daysLeft } from "../utils.js";
+import { fmtDate, today, daysLeft } from "../utils";
 import { PeriodBadge } from "./ui.jsx";
 
 export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {

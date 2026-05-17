@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { T } from "../theme.js";
-import { today, tomorrowStr, isInCurrentWeek, isInCurrentMonth, isInCurrentYear } from "../utils.js";
+import { today, tomorrowStr, isInCurrentWeek, isInCurrentMonth, isInCurrentYear } from "../utils";
 import { XPBar } from "../components/ui.jsx";
 import TaskCard from "../components/TaskCard.jsx";
 import TaskModal from "./TaskModal.jsx";

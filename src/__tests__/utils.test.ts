@@ -10,7 +10,7 @@ import {
   daysLeft, msUntilLocalMidnight,
   autoRollover, spawnRecurring,
   uid, mkCode,
-} from "../utils.js";
+} from "../utils";
 import { XP_TABLE, RANKS } from "../constants.js";
 import type { Task, QuestlyEvent } from "../types.js";
 

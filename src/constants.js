@@ -1,5 +1,5 @@
 import { T } from "./theme.js";
-import { bdName } from "./utils.js";
+import { bdName } from "./utils";
 
 // ─── GAME CONFIG ──────────────────────────────────────────────────
 export const PERIODS = [

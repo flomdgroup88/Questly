@@ -19,7 +19,7 @@ import {
   lvlOf, today,
   loadState, saveState, loadSocial, saveSocial,
   autoRollover, spawnRecurring,
-} from "../utils.js";
+} from "../utils";
 import { useTasks }           from "./useTasks.js";
 import { useCloudSync }       from "./useCloudSync.js";
 import { useNotifications }   from "./useNotifications.js";
