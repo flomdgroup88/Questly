@@ -12,10 +12,21 @@
  */
 
 import {
-  createContext, useContext, useState, useCallback,
+  createContext, useContext, useState, useEffect,
   type ReactNode, type Dispatch, type SetStateAction,
 } from "react";
 import type { SyncStatus } from "../types.js";
+
+// LS-ключ совпадает с constants.js
+const LS_KEY = "questly_v2";
+
+function persistUserFields(nickname: string, userAvatar: string) {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    const existing = raw ? JSON.parse(raw) : {};
+    localStorage.setItem(LS_KEY, JSON.stringify({ ...existing, nickname, userAvatar }));
+  } catch { /* ignore */ }
+}
 
 // ─── Форма контекста ────────────────────────────────────────────────
 interface UserContextValue {
@@ -39,7 +50,7 @@ export function useUser(): UserContextValue {
 
 // ─── Провайдер ──────────────────────────────────────────────────────
 interface UserProviderProps {
-  children:       ReactNode;
+  children:        ReactNode;
   initialNickname: string;
   initialAvatar:   string;
 }
@@ -48,6 +59,11 @@ export function UserProvider({ children, initialNickname, initialAvatar }: UserP
   const [nickname,    setNickname]    = useState(initialNickname);
   const [userAvatar,  setUserAvatar]  = useState(initialAvatar);
   const [syncStatus,  setSyncStatus]  = useState<SyncStatus>("idle");
+
+  // ── Сохраняем nickname и userAvatar в localStorage при каждом изменении ──
+  useEffect(() => {
+    persistUserFields(nickname, userAvatar);
+  }, [nickname, userAvatar]);
 
   return (
     <UserContext.Provider value={{

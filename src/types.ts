@@ -108,6 +108,7 @@ export interface AppState {
   tasks: Task[];
   events: QuestlyEvent[];
   nickname: string;
+  userAvatar: string;
   /** Timestamp последнего сохранения — используется для сравнения с облаком */
   _savedAt: number;
 }

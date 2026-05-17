@@ -107,7 +107,7 @@ export function useAppState() {
     saveState({ xp, tasks, events, _savedAt: Date.now() });
     saveSocial({ challenges, sharedGoals });
   }, [xp, tasks, events, challenges, sharedGoals]);
-  // nickname/userAvatar живут в UserContext и сохраняются оттуда
+  // nickname/userAvatar сохраняются через useEffect в UserContext (persistUserFields)
 
   // ── Облачный синк ─────────────────────────────────────────────────
   const handleCloudLoaded = useCallback(({
