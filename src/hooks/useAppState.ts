@@ -25,11 +25,15 @@ import { useCloudSync }       from "./useCloudSync.js";
 import { useNotifications }   from "./useNotifications.js";
 import { useMidnightRollover } from "./useMidnightRollover.js";
 import type { Task, QuestlyEvent, Challenge, SharedGoal } from "../types.js";
+import { useUser } from "../context/UserContext.js";
 
 export function useAppState() {
   // ── Auth ──────────────────────────────────────────────────────────
   const [authReady,    setAuthReady]    = useState(false);
   const [firebaseUser, setFirebaseUser] = useState<null | object>(null);
+
+  // Никнейм и аватар живут в UserContext — берём сеттеры отсюда
+  const { nickname, userAvatar, setNickname, setUserAvatar } = useUser();
 
   useEffect(() => {
     return onAuthStateChanged(auth, user => {
@@ -104,25 +108,29 @@ export function useAppState() {
 
   // ── Сохранение в localStorage ─────────────────────────────────────
   useEffect(() => {
-    saveState({ xp, tasks, events, _savedAt: Date.now() });
+    saveState({ xp, tasks, events, nickname, userAvatar, _savedAt: Date.now() });
     saveSocial({ challenges, sharedGoals });
-  }, [xp, tasks, events, challenges, sharedGoals]);
-  // nickname/userAvatar сохраняются через useEffect в UserContext (persistUserFields)
+  }, [xp, tasks, events, nickname, userAvatar, challenges, sharedGoals]);
+  // nickname/userAvatar теперь сохраняются и здесь, и через persistUserFields в UserContext (дублирование безопасно)
 
   // ── Облачный синк ─────────────────────────────────────────────────
   const handleCloudLoaded = useCallback(({
     tasks: t, events: e, xp: x, challenges: ch, sharedGoals: sg,
-  }: Partial<ReturnType<typeof loadState> & ReturnType<typeof loadSocial>>) => {
+    nickname: n, userAvatar: av,
+  }: Partial<ReturnType<typeof loadState> & ReturnType<typeof loadSocial> & { nickname: string; userAvatar: string }>) => {
     if (t)           setTasks(t);
     if (e)           setEvts(e);
     if (x != null)   setXP(x);
     if (ch)          setChallenges(ch);
     if (sg)          setSharedGoals(sg);
-  // Сеттеры от useState стабильны — deps пустой намеренно
+    // Восстанавливаем никнейм и аватар из облака (критично для поиска по никнейму)
+    if (n)           setNickname(n);
+    if (av)          setUserAvatar(av);
+  // Сеттеры от useState/useUser стабильны — deps пустой намеренно
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { syncStatus, syncIcon, isLoading, showOfflineToast } = useCloudSync({
-    xp, tasks, events, challenges, sharedGoals,
+    xp, tasks, events, nickname, challenges, sharedGoals,
     savedLocalTime: saved?._savedAt ?? 0,
     onCloudLoaded: handleCloudLoaded,
   });
