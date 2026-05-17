@@ -37,8 +37,6 @@ export interface Task {
   /** Пункты списка покупок */
   shopItems?: ShopItem[];
   note?: string;
-  /** Приоритет: обычная / важная / срочная */
-  priority?: "normal" | "important" | "urgent";
 }
 
 // ─── СОБЫТИЯ ─────────────────────────────────────────────────────

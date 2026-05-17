@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { T } from "../theme.js";
-import { PERIODS, CHECKLIST_PRESETS, PRIORITIES } from "../constants.js";
+import { PERIODS, CHECKLIST_PRESETS } from "../constants.js";
 import { uid, defaultDueForPeriod, today } from "../utils";
 import { ModalOverlay, SectionLabel, StyledInput, Toggle, RecurPicker, Btn } from "../components/ui.jsx";
 
@@ -22,7 +22,6 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
   const [customLabel,setCustomLabel]=useState(existing?.checklistName||"");
   const [shopItems,setShopItems]=useState(existing?.shopItems??[]);
   const [shopInput,setShopInput]=useState("");
-  const [priority,setPriority]=useState(existing?.priority??"normal");
 
   const pickPreset=p=>{
     setCheckPresetId(p.id);
@@ -44,7 +43,6 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
     onSave({
       id:existing?.id??uid(),title:title.trim(),period,done:existing?.done??false,
       xp:p.xp,dueDate,recurring,recurType,streakEnabled,streak:existing?.streak??0,
-      priority,
       ...(hasChecklist?{
         shopItems,
         checklistIcon:checkPresetId==="custom"?(customEmoji||"📋"):checklistIcon,
@@ -81,23 +79,6 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
         {bulkMode&&!isEdit&&bulkText.trim()&&(
           <div style={{fontSize:11,color:T.teal,marginTop:6,fontWeight:600}}>✓ Будет создано задач: {bulkText.split("\n").filter(l=>l.trim()).length}</div>
         )}
-      </div>
-
-      <div style={{marginBottom:14}}>
-        <SectionLabel>Приоритет</SectionLabel>
-        <div style={{display:"flex",gap:8}}>
-          {PRIORITIES.map(pr=>{
-            const isSelected=priority===pr.id;
-            const borderColor=pr.id==="normal"?T.brd:pr.color;
-            const bg=isSelected?(pr.id==="normal"?T.bg0:pr.color+"22"):T.bg0;
-            return (
-              <div key={pr.id} onClick={()=>setPriority(pr.id)} style={{flex:1,padding:"10px 6px",borderRadius:11,cursor:"pointer",textAlign:"center",border:`2px solid ${isSelected?borderColor:T.brd}`,background:bg,transition:"all 0.15s"}}>
-                <div style={{fontSize:15,fontWeight:900,color:isSelected?(pr.id==="normal"?T.sub:pr.color):T.dim,marginBottom:2}}>{pr.icon}</div>
-                <div style={{fontSize:11,fontWeight:700,color:isSelected?(pr.id==="normal"?T.text:pr.color):T.sub}}>{pr.label}</div>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       <div style={{marginBottom:14}}>

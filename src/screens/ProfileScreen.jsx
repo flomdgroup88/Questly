@@ -4,7 +4,7 @@ import { PERIODS, RANKS, RANK_ICONS } from "../constants.js";
 import { lvlOf, progOf, nextXP, today } from "../utils";
 import { XPBar } from "../components/ui.jsx";
 
-export default function ProfileScreen({ xp, tasks, events, challenges = [], nickname, onSetNickname, userAvatar, onSetAvatar, syncStatus, onImport, onLogout, notifEnabled, reminderTime, permissionState, notifSaving, onEnableNotif, onDisableNotif, onUpdateReminderTime, isDark, onToggleTheme }) {
+export default function ProfileScreen({ xp, tasks, events, challenges = [], nickname, onSetNickname, userAvatar, onSetAvatar, syncStatus, onImport, onLogout, notifEnabled, reminderTime, permissionState, notifSaving, onEnableNotif, onDisableNotif, onUpdateReminderTime }) {
   const level=lvlOf(xp), rank=RANKS[Math.min(level-1,RANKS.length-1)];
   const rankIcon=RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)];
   const toNext=nextXP(xp), completed=tasks.filter(t=>t.done).length, total=tasks.length;
@@ -231,27 +231,6 @@ export default function ProfileScreen({ xp, tasks, events, challenges = [], nick
         </div>
       </div>
 
-
-      {/* ─── Тема ─────────────────────────────────────────── */}
-      <div style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:14,padding:"4px",marginBottom:16,display:"flex",gap:4}}>
-        {[
-          { dark: true,  icon: "🌙", label: "Тёмная"  },
-          { dark: false, icon: "☀️", label: "Светлая" },
-        ].map(opt => {
-          const active = isDark === opt.dark;
-          return (
-            <div key={String(opt.dark)} onClick={() => !active && onToggleTheme && onToggleTheme()}
-              style={{flex:1,padding:"10px 0",borderRadius:10,textAlign:"center",cursor:active?"default":"pointer",
-                background:active?T.bg0:"transparent",
-                border:`1.5px solid ${active?T.brd:"transparent"}`,
-                boxShadow:active?"0 1px 6px #0002":"none",
-                transition:"all 0.25s"}}>
-              <div style={{fontSize:18,marginBottom:2}}>{opt.icon}</div>
-              <div style={{fontSize:12,fontWeight:700,color:active?T.text:T.dim}}>{opt.label}</div>
-            </div>
-          );
-        })}
-      </div>
 
       {/* ─── Уведомления ──────────────────────────────────── */}
       <NotificationsBlock

@@ -12,8 +12,8 @@
  *  • nickname / avatar   → src/context/UserContext.tsx
  */
 
-import { useState, useCallback, useEffect } from "react";
-import { T, applyTheme, loadThemeIsDark } from "./theme.js";
+import { useCallback, useEffect } from "react";
+import { T }                 from "./theme.js";
 import { RANKS, RANK_ICONS } from "./constants.js";
 import { lvlOf, progOf, loadState } from "./utils";
 import { initUserSync, cloudPublishProfile } from "./firebase.js";
@@ -47,23 +47,6 @@ const TABS = [
 function AppInner() {
   const { nickname, userAvatar, setNickname, setUserAvatar } = useUser();
 
-  // ── Тема ──────────────────────────────────────────────────────────
-  const [isDark, setIsDark] = useState(() => {
-    const d = loadThemeIsDark();
-    applyTheme(d);
-    return d;
-  });
-  const toggleTheme = () => {
-    const next = !isDark;
-    applyTheme(next);
-    setIsDark(next);
-    if (tg) {
-      const bg = next ? "#07071C" : "#FFFFFF";
-      tg.setHeaderColor(bg);
-      tg.setBackgroundColor(bg);
-    }
-  };
-
   const {
     authReady, firebaseUser, handleLogout,
     tasks, events, challenges, sharedGoals,
@@ -77,7 +60,6 @@ function AppInner() {
     showNicknameGate, setShowNicknameGate,
     overviewEditTask, setOverviewEditTask,
     handleToggle, handleSave, handleDelete, handleShopToggle,
-    handleReorder,
     handleImport,
     handleAddEvent, handleEditEvent, handleDeleteEvent,
     handleUpdateCh, handleUpdateSg,
@@ -129,8 +111,8 @@ function AppInner() {
     <div style={{ ...shellStyle, maxHeight: "100vh", position: "relative", overflow: "hidden" }}>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-        input[type=date]::-webkit-calendar-picker-indicator{filter:${isDark?"invert(0.7)":"invert(0.3)"};cursor:pointer;}
-        input[type=date]{color-scheme:${isDark?"dark":"light"};}
+        input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.7);cursor:pointer;}
+        input[type=date]{color-scheme:dark;}
         ::-webkit-scrollbar{width:3px;}
         ::-webkit-scrollbar-thumb{background:${T.brd};border-radius:2px;}
         @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -241,10 +223,10 @@ function AppInner() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <ErrorBoundary key={tab}>
           {tab === "overview"  && <OverviewScreen tasks={tasks} xp={xp} level={level} rank={RANKS[Math.min(level-1,RANKS.length-1)]} rankIcon={RANK_ICONS[Math.min(level-1,RANK_ICONS.length-1)]} xpProgress={progOf(xp)} onEditTask={setOverviewEditTask} onToggle={handleToggle} />}
-          {tab === "tasks"     && <TasksScreen    tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} onReorder={handleReorder} />}
+          {tab === "tasks"     && <TasksScreen    tasks={tasks} onToggle={handleToggle} onSave={handleSave} onDelete={handleDelete} onShopToggle={handleShopToggle} />}
           {tab === "calendar"  && <CalendarScreen events={events} tasks={tasks} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
-          {tab === "social"    && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} nickname={nickname} userAvatar={userAvatar} xp={xp} />}
-          {tab === "profile"   && <ProfileScreen  xp={xp} tasks={tasks} events={events} challenges={challenges} nickname={nickname} userAvatar={userAvatar} onSetNickname={setNickname} onSetAvatar={setUserAvatar} onImport={handleImport} onLogout={handleLogout} notifEnabled={notif.notifEnabled} reminderTime={notif.reminderTime} permissionState={notif.permissionState} notifSaving={notif.saving} onEnableNotif={notif.enableNotifications} onDisableNotif={notif.disableNotifications} onUpdateReminderTime={notif.updateReminderTime} isDark={isDark} onToggleTheme={toggleTheme} />}
+          {tab === "social"    && <SocialScreen   challenges={challenges} sharedGoals={sharedGoals} onUpdateCh={handleUpdateCh} onUpdateSg={handleUpdateSg} onDeleteCh={handleDeleteCh} onDeleteSg={handleDeleteSg} onCreateCh={handleCreateCh} onCreateSg={handleCreateSg} nickname={nickname} userAvatar={userAvatar} />}
+          {tab === "profile"   && <ProfileScreen  xp={xp} tasks={tasks} events={events} challenges={challenges} nickname={nickname} userAvatar={userAvatar} onSetNickname={setNickname} onSetAvatar={setUserAvatar} onImport={handleImport} onLogout={handleLogout} notifEnabled={notif.notifEnabled} reminderTime={notif.reminderTime} permissionState={notif.permissionState} notifSaving={notif.saving} onEnableNotif={notif.enableNotifications} onDisableNotif={notif.disableNotifications} onUpdateReminderTime={notif.updateReminderTime} />}
         </ErrorBoundary>
       </div>
 
