@@ -4,10 +4,10 @@ import { PERIODS, CHECKLIST_PRESETS } from "../constants.js";
 import { uid, defaultDueForPeriod, today } from "../utils.js";
 import { ModalOverlay, SectionLabel, StyledInput, Toggle, RecurPicker, Btn } from "../components/ui.jsx";
 
-export default function TaskModal({ onClose, onSave, onDelete, existing=null, initialDate=null }) {
+export default function TaskModal({ onClose, onSave, onDelete, existing=null, initialDate=null, initialPeriod=null }) {
   const isEdit=!!existing;
   const [title,   setTitle] =useState(existing?.title    ??"");
-  const [period,  setPeriod]=useState(existing?.period   ??"day");
+  const [period,  setPeriod]=useState(existing?.period   ??(initialPeriod??"day"));
   const [dueDate, setDate]  =useState(existing?.dueDate  ??initialDate??defaultDueForPeriod(existing?.period??"day"));
   const [recurring,setRec]  =useState(existing?.recurring??false);
   const [recurType,setRT]   =useState(existing?.recurType??"day");

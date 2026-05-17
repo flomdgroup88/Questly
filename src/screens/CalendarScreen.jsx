@@ -18,6 +18,7 @@ function CalendarGrid({ year, month, events, selectedDate, onSelect }) {
     const [ey,em,ed]=ev.date.split("-").map(Number);
     if(ey===year&&em===month+1) add(ed);
     if(ev.recurring&&ev.recurType==="year"&&em===month+1) add(ed);
+    if(ev.recurring&&ev.recurType==="month"){const evStart=new Date(ey,em-1,1);const gridStart=new Date(year,month,1);if(gridStart>=evStart){const targetDay=Math.min(ed,last.getDate());add(targetDay);}}
     if(ev.recurring&&ev.recurType==="week"){const dow=new Date(ev.date).getDay();for(let d=1;d<=last.getDate();d++)if(new Date(year,month,d).getDay()===dow)add(d);}
     if(ev.recurring&&ev.recurType==="day") for(let d=1;d<=last.getDate();d++) add(d);
   });
@@ -68,6 +69,7 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
     if(ev.date===selDate) return true;
     const [,em,ed]=ev.date.split("-").map(Number),[,sm,sd]=selDate.split("-").map(Number);
     if(ev.recurring&&ev.recurType==="year"&&em===sm&&ed===sd) return true;
+    if(ev.recurring&&ev.recurType==="month"){const [ey2,em2,ed2]=ev.date.split("-").map(Number);const [sy,sm,sd]=selDate.split("-").map(Number);const evStart=new Date(ey2,em2-1,1);const selStart=new Date(sy,sm-1,1);if(selStart>=evStart){const lastDayOfSel=new Date(sy,sm,0).getDate();return Math.min(ed2,lastDayOfSel)===sd;}return false;}
     if(ev.recurring&&ev.recurType==="week") return new Date(ev.date).getDay()===new Date(selDate).getDay();
     if(ev.recurring&&ev.recurType==="day") return true;
     return false;
@@ -110,7 +112,7 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:15,fontWeight:700,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ev.title}</div>
-                  <div style={{fontSize:11,color:ev.color,marginTop:3,fontWeight:600}}>{ev.recurring?`🔄 ${ev.recurType==="year"?"Ежегодно":ev.recurType==="week"?"Еженедельно":"Ежедневно"}`:"📌 Разовое"}</div>
+                  <div style={{fontSize:11,color:ev.color,marginTop:3,fontWeight:600}}>{ev.recurring?`🔄 ${ev.recurType==="year"?"Ежегодно":ev.recurType==="month"?"Ежемесячно":ev.recurType==="week"?"Еженедельно":"Ежедневно"}`:"📌 Разовое"}</div>
                 </div>
                 <div style={{fontSize:14,color:T.sub,flexShrink:0}}>✏️</div>
               </div>

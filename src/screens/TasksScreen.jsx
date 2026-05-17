@@ -99,7 +99,7 @@ export default function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopT
         <div onClick={()=>setCreate(true)} style={{width:52,height:52,borderRadius:"50%",cursor:"pointer",background:`linear-gradient(135deg,${T.purp},${T.gold})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,color:"#fff",boxShadow:`0 4px 20px ${T.purp}88, 0 0 0 4px ${T.bg0}`,transition:"transform 0.2s cubic-bezier(.34,1.56,.64,1)"}}>+</div>
       </div>
 
-      {showCreate&&<TaskModal onClose={()=>setCreate(false)} onSave={t=>{onSave(t);setCreate(false);}} initialDate={filter==="tomorrow"?tomorrowStr():null}/>}
+      {showCreate&&<TaskModal onClose={()=>setCreate(false)} onSave={t=>{onSave(t);setCreate(false);}} initialDate={filter==="tomorrow"?tomorrowStr():null} initialPeriod={filter==="tomorrow"?"day":filter}/>}
       {editTask&&<TaskModal existing={editTask} onClose={()=>setEdit(null)} onSave={t=>{onSave(t);setEdit(null);}} onDelete={id=>{onDelete(id);setEdit(null);}}/>}
     </div>
   );
