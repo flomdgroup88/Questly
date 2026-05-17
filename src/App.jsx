@@ -12,7 +12,7 @@
  *  • nickname / avatar   → src/context/UserContext.tsx
  */
 
-import { useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { T, applyTheme, loadThemeIsDark } from "./theme.js";
 import { RANKS, RANK_ICONS } from "./constants.js";
 import { lvlOf, progOf, loadState } from "./utils";
