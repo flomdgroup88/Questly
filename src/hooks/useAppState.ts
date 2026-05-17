@@ -230,6 +230,15 @@ export function useAppState() {
     overviewEditTask, setOverviewEditTask,
     // Обработчики задач
     handleToggle, handleSave, handleDelete, handleShopToggle,
+    handleReorder: (reorderedIds: string[]) => {
+      setTasks(prev => {
+        const reorderedSet = new Set(reorderedIds);
+        const byId = new Map(prev.map(t => [t.id, t]));
+        const reorderedTasks = reorderedIds.map(id => byId.get(id)).filter(Boolean) as typeof prev;
+        let ri = 0;
+        return prev.map(t => reorderedSet.has(t.id) ? reorderedTasks[ri++] : t);
+      });
+    },
     handleImport,
     // Обработчики событий
     handleAddEvent, handleEditEvent, handleDeleteEvent,
