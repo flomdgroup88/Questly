@@ -152,6 +152,44 @@ export function useCloudSync({
     };
   }, [xp, tasks, events, nickname, challenges, sharedGoals]);
 
+  // ── Немедленный синк при уходе из приложения (visibilitychange / pagehide) ──
+  // Это критично для PWA на iOS: при удалении с экрана домой localStorage стирается,
+  // а дебаунс 4 сек мог не успеть отправить последние изменения в Firebase.
+  const latestDataRef = useRef({});
+  useEffect(() => {
+    latestDataRef.current = { xp, tasks, events, nickname, challenges, sharedGoals };
+  }, [xp, tasks, events, nickname, challenges, sharedGoals]);
+
+  useEffect(() => {
+    const flush = () => {
+      const key = userKeyRef.current;
+      if (!key) return;
+      // Отменяем дебаунс-таймеры — flush уже делает сохранение
+      clearTimeout(syncTimerRef.current);
+      clearTimeout(maxWaitTimerRef.current);
+      maxWaitTimerRef.current = null;
+      const d = latestDataRef.current;
+      // sendBeacon не подходит для Firebase SDK — используем fetch с keepalive
+      // cloudSaveUserData — async, но браузер даст ~500ms на исполнение при pagehide
+      cloudSaveUserData(key, {
+        ...d,
+        _savedAt: Date.now(),
+      });
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const syncIcon =
     syncStatus === "saving" ? "⏳" :
     syncStatus === "saved"  ? "☁️✓" :
