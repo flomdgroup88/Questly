@@ -30,6 +30,7 @@ export function useCloudSync({
   onCloudLoaded,
 }) {
   const [syncStatus, setSyncStatus] = useState("idle");
+  const [syncErrorCode, setSyncErrorCode] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showOfflineToast, setShowOfflineToast] = useState(false);
   const offlineToastTimer = useRef(null);
@@ -128,7 +129,7 @@ export function useCloudSync({
       maxWaitTimerRef.current = null;
 
       setSyncStatus("saving");
-      const ok = await cloudSaveUserData(userKeyRef.current, {
+      const result = await cloudSaveUserData(userKeyRef.current, {
         xp,
         tasks,
         events,
@@ -138,14 +139,16 @@ export function useCloudSync({
         _savedAt: Date.now(),
       });
 
-      if (ok) {
+      if (result.ok) {
         setSyncStatus("saved");
         setTimeout(() => setSyncStatus("idle"), 3000);
       } else {
         setSyncStatus("error");
+        // Сохраняем код ошибки для отображения в тосте
+        setSyncErrorCode(result.code ?? "unknown");
         clearTimeout(offlineToastTimer.current);
         setShowOfflineToast(true);
-        offlineToastTimer.current = setTimeout(() => setShowOfflineToast(false), 4000);
+        offlineToastTimer.current = setTimeout(() => setShowOfflineToast(false), 5000);
         setTimeout(() => setSyncStatus("idle"), 3000);
       }
     };
@@ -171,5 +174,5 @@ export function useCloudSync({
     syncStatus === "saved"  ? "☁️✓" :
     syncStatus === "error"  ? "⚠️" : null;
 
-  return { syncStatus, syncIcon, isLoading, showOfflineToast };
+  return { syncStatus, syncIcon, isLoading, showOfflineToast, syncErrorCode };
 }

@@ -65,17 +65,35 @@ export async function logOut() {
 
 // ─── USER DATA SYNC ───────────────────────────────────────────────
 // Сохранить личные задачи + события в облако
-export async function cloudSaveUserData(userKey, data) {
-  if (!userKey) return false;
-  try {
-    await setDoc(doc(db, "userData", userKey), {
-      ...data,
-      _savedAt: Date.now(),
-    });
-    return true;
-  } catch (e) {
-    console.warn("cloudSaveUserData error:", e);
-    return false;
+// Ошибки, при которых retry бессмысленен (проблема не в сети)
+const NO_RETRY_CODES = new Set(["permission-denied", "unauthenticated", "not-found", "invalid-argument"]);
+
+export async function cloudSaveUserData(userKey, data, { retries = 3, baseDelay = 1500 } = {}) {
+  if (!userKey) return { ok: false, code: "no-key" };
+
+  const payload = { ...data, _savedAt: Date.now() };
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      await setDoc(doc(db, "userData", userKey), payload);
+      return { ok: true };
+    } catch (e) {
+      const code = e.code ?? "unknown";
+      console.warn(`cloudSaveUserData attempt ${attempt + 1} failed:`, code, e.message);
+
+      // Не повторяем при ошибках, не связанных с сетью
+      if (NO_RETRY_CODES.has(code)) {
+        return { ok: false, code, message: e.message };
+      }
+
+      // Последняя попытка — возвращаем ошибку
+      if (attempt === retries) {
+        return { ok: false, code, message: e.message };
+      }
+
+      // Экспоненциальная пауза перед следующей попыткой
+      await new Promise(res => setTimeout(res, baseDelay * 2 ** attempt));
+    }
   }
 }
 
