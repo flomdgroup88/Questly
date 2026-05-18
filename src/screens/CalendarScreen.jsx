@@ -102,7 +102,7 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
     const byDone   = t.done && (t.doneHistory||[]).includes(selDate);
     if(inPeriod||byDone){ selTaskIds.add(t.id); return true; }
     return false;
-  });
+  }).sort((a,b)=>Number(a.done)-Number(b.done));
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
