@@ -29,6 +29,10 @@ interface AchievementInput {
   xp:         number;
   events:     any[];
   challenges: any[];
+  /** Пока isLoading=true (идёт загрузка из облака), не инициализируем seen-список.
+   *  Иначе хук успевает «засидить» пустой список до прихода облачных данных —
+   *  и все ранее заработанные ачивки показываются заново после переустановки PWA. */
+  isLoading:  boolean;
 }
 
 export interface Achievement {
@@ -38,7 +42,7 @@ export interface Achievement {
   cat:   string;
 }
 
-export function useAchievements({ tasks, xp, events, challenges }: AchievementInput) {
+export function useAchievements({ tasks, xp, events, challenges, isLoading }: AchievementInput) {
   const [queue, setQueue] = useState<Achievement[]>([]);
   const seenRef        = useRef<Set<string>>(loadSeen());
   const initializedRef = useRef(false);
@@ -228,6 +232,11 @@ export function useAchievements({ tasks, xp, events, challenges }: AchievementIn
 
   // ── Детектируем новые ачивки ─────────────────────────────────────
   useEffect(() => {
+    // Ждём пока облако загрузится — иначе инициализация происходит на пустых
+    // локальных данных, а потом все облачные ачивки приходят как «новые»
+    // (актуально после переустановки PWA, когда localStorage очищен).
+    if (isLoading) return;
+
     const doneNow = achievements.filter(a => (a as any).done);
 
     if (!initializedRef.current) {
@@ -250,7 +259,7 @@ export function useAchievements({ tasks, xp, events, challenges }: AchievementIn
 
     setQueue(prev => [...prev, ...newlyUnlocked]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [achievements]);
+  }, [achievements, isLoading]);
 
   const dismiss = () => setQueue(prev => prev.slice(1));
 

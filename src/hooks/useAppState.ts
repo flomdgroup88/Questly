@@ -94,8 +94,11 @@ export function useAppState() {
 
   // ── UI-стейт ──────────────────────────────────────────────────────
   const [tab,             setTab]           = useState("overview");
+  // Онбординг показывается ПОСЛЕ входа — только по флагу в localStorage.
+  // Убрали условие !loadState(): saveState() вызывается при первом рендере
+  // и сразу делает loadState() ненулевым, из-за чего онбординг скипался.
   const [showOnboarding,  setShowOnboarding] = useState(
-    () => !localStorage.getItem("questly_onboarding_done") && !loadState()
+    () => !localStorage.getItem("questly_onboarding_done")
   );
   const [showGlobalCreate, setShowGlobalCreate] = useState(false);
   const [showNicknameGate, setShowNicknameGate] = useState(false);

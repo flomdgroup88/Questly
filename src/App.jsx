@@ -92,7 +92,7 @@ function AppInner() {
 
   // ── Ачивки ────────────────────────────────────────────────────────
   const { achievementQueue, dismissAchievement } = useAchievements({
-    tasks, xp, events, challenges,
+    tasks, xp, events, challenges, isLoading,
   });
 
   // Публикуем профиль в Firestore при изменении никнейма, аватара или соревнований.
@@ -128,8 +128,13 @@ function AppInner() {
     </div>
   );
 
-  // Новый пользователь без аккаунта — сначала онбординг, потом регистрация
-  if (!firebaseUser && !isTelegram && showOnboarding) return (
+  // Не авторизован — сначала регистрация / вход
+  if (!firebaseUser && !isTelegram) return (
+    <div style={shellStyle}><AuthScreen /></div>
+  );
+
+  // Авторизован, но онбординг ещё не показывали — показываем после входа
+  if (!isTelegram && showOnboarding) return (
     <div style={shellStyle}>
       <OnboardingModal
         onDone={() => {
@@ -142,10 +147,6 @@ function AppInner() {
         }}
       />
     </div>
-  );
-
-  if (!firebaseUser && !isTelegram) return (
-    <div style={shellStyle}><AuthScreen /></div>
   );
 
   return (
