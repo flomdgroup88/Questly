@@ -128,6 +128,22 @@ function AppInner() {
     </div>
   );
 
+  // Новый пользователь без аккаунта — сначала онбординг, потом регистрация
+  if (!firebaseUser && !isTelegram && showOnboarding) return (
+    <div style={shellStyle}>
+      <OnboardingModal
+        onDone={() => {
+          localStorage.setItem("questly_onboarding_done", "1");
+          setShowOnboarding(false);
+        }}
+        onCreateFirst={() => {
+          localStorage.setItem("questly_onboarding_done", "1");
+          setShowOnboarding(false);
+        }}
+      />
+    </div>
+  );
+
   if (!firebaseUser && !isTelegram) return (
     <div style={shellStyle}><AuthScreen /></div>
   );
@@ -148,12 +164,6 @@ function AppInner() {
         @keyframes bonusSlide{0%{opacity:0;transform:translateX(-50%) translateY(-32px) scale(0.9)}12%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}80%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-16px) scale(0.95)}}
       `}</style>
 
-      {showOnboarding && (
-        <OnboardingModal
-          onDone={() => setShowOnboarding(false)}
-          onCreateFirst={() => { setShowOnboarding(false); setTab("tasks"); setShowGlobalCreate(true); }}
-        />
-      )}
       {showNicknameGate && (
         <NicknameGateModal
           onDone={() => { setShowNicknameGate(false); setTab("social"); }}
