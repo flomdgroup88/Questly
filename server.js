@@ -30,7 +30,9 @@ async function initAdmin() {
     const { getFirestore }                 = await import("firebase-admin/firestore");
 
     if (!getApps().length) {
-      initializeApp({ credential: cert(JSON.parse(keyJson)) });
+      // Railway иногда экранирует \n в private_key — нормализуем перед парсингом
+    const serviceAccount = JSON.parse(keyJson.replace(/\\n/g, "\n"));
+    initializeApp({ credential: cert(serviceAccount) });
     }
     adminMessaging = getMessaging();
     adminDb        = getFirestore();
