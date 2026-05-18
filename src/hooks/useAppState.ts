@@ -94,7 +94,9 @@ export function useAppState() {
 
   // ── UI-стейт ──────────────────────────────────────────────────────
   const [tab,             setTab]           = useState("overview");
-  const [showOnboarding,  setShowOnboarding] = useState(() => !loadState());
+  const [showOnboarding,  setShowOnboarding] = useState(
+    () => !localStorage.getItem("questly_onboarding_done") && !loadState()
+  );
   const [showGlobalCreate, setShowGlobalCreate] = useState(false);
   const [showNicknameGate, setShowNicknameGate] = useState(false);
   const [overviewEditTask, setOverviewEditTask] = useState<Task | null>(null);
