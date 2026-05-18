@@ -87,7 +87,10 @@ function AppInner() {
     handleCreateCh, handleCreateSg,
   } = useAppState();
 
-  const isTelegram = !!(tg && window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
+  const isTelegram  = !!(tg && window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
+  // Анонимный вход (initUserSync) не считается настоящим — пользователь должен
+  // зарегистрироваться через email/пароль или зайти через Telegram.
+  const isRealUser  = !!(firebaseUser && !firebaseUser.isAnonymous);
   const level      = lvlOf(xp);
 
   // ── Ачивки ────────────────────────────────────────────────────────
@@ -129,7 +132,7 @@ function AppInner() {
   );
 
   // Не авторизован — сначала регистрация / вход
-  if (!firebaseUser && !isTelegram) return (
+  if (!isRealUser && !isTelegram) return (
     <div style={shellStyle}><AuthScreen /></div>
   );
 
