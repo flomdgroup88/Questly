@@ -105,14 +105,10 @@ export const EVENT_TYPES = [
   {
     id:"trip", icon:"✈️", label:"Поездка",
     get color(){ return T.teal; },
-    hint:"Создадутся три задачи-шаблона: билеты, багаж и жильё.",
+    hint:"Поездка фиксируется в календаре — без дополнительных задач.",
     get hintColor(){ return T.teal; },
     defaultRec:false, defaultRecType:"",
-    makeTasks:(title, date)=>[
-      { title:`✈️ Купить билеты: ${title}`,         period:"day", xp:30, recurring:false, recurType:"", dueDate:date },
-      { title:`🧳 Упаковать чемодан: ${title}`,     period:"day", xp:20, recurring:false, recurType:"", dueDate:date },
-      { title:`🏨 Проверить бронирование: ${title}`,period:"day", xp:20, recurring:false, recurType:"", dueDate:date },
-    ],
+    makeTasks:()=>[],
   },
   {
     id:"deadline", icon:"⏰", label:"Дедлайн",

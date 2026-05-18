@@ -91,12 +91,13 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
     return false;
   });
 
-  // Показываем задачи, если:
-  // • их dueDate попадает в период (вся неделя / месяц / год), а не только точная дата
+  // Показываем только дневные задачи (period === "day"):
+  // • их dueDate совпадает с выбранным днём
   // • либо задача выполнена именно в этот день (doneHistory)
   const selTaskIds=new Set();
   const selTasks=tasks.filter(t=>{
     if(selTaskIds.has(t.id)) return false;
+    if(t.period !== "day") return false;
     const inPeriod = isDateInTaskPeriod(t, selDate);
     const byDone   = t.done && (t.doneHistory||[]).includes(selDate);
     if(inPeriod||byDone){ selTaskIds.add(t.id); return true; }
