@@ -46,6 +46,21 @@ export function PeriodBadge({ period, small }) {
   );
 }
 
+// ─── HASHTAG BADGE ────────────────────────────────────────────────
+export function HashtagBadge({ tag, color, small }) {
+  if (!tag) return null;
+  const label = tag.startsWith("#") ? tag : `#${tag}`;
+  return (
+    <span style={{
+      fontSize:small?10:11,fontWeight:700,
+      padding:small?"1px 7px":"2px 9px",borderRadius:20,
+      background:color+"22",color:color,
+      border:`1px solid ${color}44`,letterSpacing:"0.02em",
+      whiteSpace:"nowrap",flexShrink:0,
+    }}>{label}</span>
+  );
+}
+
 // ─── MODAL OVERLAY ────────────────────────────────────────────────
 export function ModalOverlay({ onClose, children }) {
   useEffect(()=>{document.body.style.overflow="hidden";return()=>{document.body.style.overflow="";};}, []);

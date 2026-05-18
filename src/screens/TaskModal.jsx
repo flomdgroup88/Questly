@@ -24,6 +24,14 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
   const [shopInput,setShopInput]=useState("");
   const [priority,setPriority]=useState(existing?.priority??"normal");
   const [note,setNote]=useState(existing?.note??"");
+  const [hashtag,setHashtag]=useState(existing?.hashtag??"");
+  const [hashtagColor,setHashtagColor]=useState(existing?.hashtagColor??"#06D6A0");
+
+  const HASHTAG_COLORS=[
+    "#06D6A0","#38BDF8","#8B5CF6","#F5A623",
+    "#F43F5E","#FF6B35","#A78BFA","#34D399",
+    "#FB923C","#60A5FA","#E879F9","#FBBF24",
+  ];
 
   const pickPreset=p=>{
     setCheckPresetId(p.id);
@@ -47,6 +55,8 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
       xp:p.xp,dueDate,recurring,recurType,streakEnabled,streak:existing?.streak??0,
       priority,
       note:note.trim()||undefined,
+      hashtag:hashtag.trim()?hashtag.trim().replace(/^#*/,""):undefined,
+      hashtagColor:hashtag.trim()?hashtagColor:undefined,
       ...(hasChecklist?{
         shopItems,
         checklistIcon:checkPresetId==="custom"?(customEmoji||"📋"):checklistIcon,
@@ -105,6 +115,54 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
           onFocus={e=>e.target.style.borderColor=T.purp}
           onBlur={e=>e.target.style.borderColor=T.brd}
         />
+      </div>
+
+      <div style={{marginBottom:14}}>
+        <SectionLabel>Хештег (необязательно)</SectionLabel>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <div style={{position:"relative",flex:1}}>
+            <span style={{
+              position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",
+              fontSize:15,fontWeight:800,
+              color:hashtag.trim()?hashtagColor:T.dim,
+              pointerEvents:"none",lineHeight:1,
+            }}>#</span>
+            <input
+              value={hashtag}
+              onChange={e=>setHashtag(e.target.value.replace(/^#*/,""))}
+              placeholder="работа, здоровье, личное…"
+              style={{
+                width:"100%",padding:"11px 14px 11px 26px",
+                background:T.bg0,
+                border:`1px solid ${hashtag.trim()?hashtagColor+"88":T.brd}`,
+                borderRadius:11,color:T.text,fontSize:14,outline:"none",
+                colorScheme:T.cs,transition:"border-color 0.2s",
+              }}
+              onFocus={e=>e.target.style.borderColor=hashtagColor+"AA"}
+              onBlur={e=>e.target.style.borderColor=hashtag.trim()?hashtagColor+"88":T.brd}
+            />
+          </div>
+          {hashtag.trim()&&(
+            <span style={{
+              fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,
+              background:hashtagColor+"22",color:hashtagColor,
+              border:`1px solid ${hashtagColor}44`,whiteSpace:"nowrap",flexShrink:0,
+            }}>#{hashtag}</span>
+          )}
+        </div>
+        {/* Color picker */}
+        <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+          {HASHTAG_COLORS.map(c=>(
+            <div key={c} onClick={()=>setHashtagColor(c)} style={{
+              width:26,height:26,borderRadius:"50%",
+              background:c,cursor:"pointer",flexShrink:0,
+              border:`2.5px solid ${hashtagColor===c?"#fff":"transparent"}`,
+              boxShadow:hashtagColor===c?`0 0 0 2px ${c},0 0 8px ${c}66`:"none",
+              transition:"all 0.15s cubic-bezier(.34,1.56,.64,1)",
+              transform:hashtagColor===c?"scale(1.18)":"scale(1)",
+            }}/>
+          ))}
+        </div>
       </div>
 
       <div style={{marginBottom:14}}>

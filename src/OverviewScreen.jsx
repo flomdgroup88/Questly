@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { T } from "./theme.js";
+import { HashtagBadge } from "./components/ui.jsx";
 
 const TABS = [
   { key:"day",      label:"Сегодня" },
@@ -134,6 +135,11 @@ function TaskRow({ task, num, accent, activeTab, isDragging, isDropTarget, onDra
         }}>
           {task.title}
         </div>
+        {task.hashtag && (
+          <div style={{marginTop:4}}>
+            <HashtagBadge tag={task.hashtag} color={task.hashtagColor||"#8B5CF6"} small/>
+          </div>
+        )}
         {due && (
           <div style={{fontSize:11, color:due.color, marginTop:3, fontWeight:500}}>
             {due.label}

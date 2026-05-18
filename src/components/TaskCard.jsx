@@ -2,7 +2,7 @@ import { useState } from "react";
 import { T } from "../theme.js";
 import { PERIODS, PRIORITIES } from "../constants.js";
 import { fmtDate, today, daysLeft } from "../utils";
-import { PeriodBadge } from "./ui.jsx";
+import { PeriodBadge, HashtagBadge } from "./ui.jsx";
 
 export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
   const p=PERIODS.find(x=>x.id===task.period);
@@ -55,7 +55,10 @@ export default function TaskCard({ task, onToggle, onEdit, onShopToggle }) {
             wordBreak:"break-word",marginBottom:5,
           }}>{task.title}</div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-            <PeriodBadge period={task.period} small/>
+            {task.hashtag
+              ? <HashtagBadge tag={task.hashtag} color={task.hashtagColor||"#8B5CF6"} small/>
+              : <PeriodBadge period={task.period} small/>
+            }
             <span style={{fontSize:11,color:T.gold,fontWeight:700}}>+{task.xp} XP</span>
             {hasStripe&&!task.done&&(
               <span style={{fontSize:10,fontWeight:800,color:pr.stripe,background:pr.stripe+"22",border:`1px solid ${pr.stripe}44`,padding:"1px 7px",borderRadius:20}}>{pr.icon} {pr.label}</span>
