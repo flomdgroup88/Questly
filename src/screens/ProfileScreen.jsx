@@ -30,6 +30,38 @@ export default function ProfileScreen({ xp, tasks, events, challenges = [], nick
   const completedOnSunday=tasks.some(t=>(t.doneHistory||[]).some(d=>new Date(d).getDay()===0));
   const activeDays=new Set(tasks.flatMap(t=>t.doneHistory||[])).size;
 
+  // ── Хэштег-категории: синонимы (20+ на тему) ────────────────────
+  function matchTag(title, syns) {
+    const s = (title || "").toLowerCase().replace(/[#_]/g, " ");
+    return syns.some(syn => s.includes(syn));
+  }
+  const WORK_SYNS   = ["работ","work","ворк","офис","проект","отчёт","отчет","совещани","коллег","клиент","бизнес","карьер","зарплат","собеседовани","дедлайн","презентаци","контракт","партнёр","партнер","переговор","стартап","фриланс","митинг","задани","корпоратив","менеджер","шеф","руководств","поставщик"];
+  const TRAVEL_SYNS = ["путешестви","поездк","trip","travel","отпуск","виза","билет","самолёт","самолет","отел","гостиниц","чемодан","заграниц","маршрут","аэропорт","вокзал","экскурси","курорт","путёвк","путевк","турне","рюкзак","хостел","бронировани","паспорт","туризм"];
+  const MOVIE_SYNS  = ["фильм","кино","movie","cinema","кинотеатр","мультик","мультфильм","аниме","блокбастер","документалк","netflix","нетфликс","голливуд","сеанс","просмотр","кинчик","режиссёр","режиссер","оскар","триллер","комедия","боевик","мелодрам","ужас","премьер"];
+  const SERIES_SYNS = ["сериал","series","серию","серий","эпизод","episode","сезон","season","шоу","show","hbo","disney","амедиатека","стриминг","kinopoisk","кинопоиск","нетфликс","netflix","prime","ivi","okko","смотрим","онлайн-кинотеатр"];
+  const HOME_SYNS   = ["уборк","уборку","ремонт","посуд","стирк","пылесос","готовк","готовить","кухн","квартир","хозяйств","починить","поломк","быт","мусор","cleaning","мытьё","мытье","глажк","сантехник","электрик","мебел","окна"];
+  const FAMILY_SYNS = ["семь","семей","дети","детей","ребёнок","ребенок","родители","мама","папа","бабушк","дедушк","братья","сёстры","сестр","муж","жен","супруг","family","племянник","свекровь","тёщ","тещ","отец","мать","дочь","сын"];
+  const DACHA_SYNS  = ["дача","дачн","огород","грядк","урожай","посадить","посев","полит","теплиц","компост","картошк","клубник","деревн","газон","скосить","трава","огурц","помидор","яблон","вишн","малин","забор","баня","колодец"];
+  const CAR_SYNS    = ["машин","авто","тачк","автомобил","мойк","техосмотр","страховк","заправк","гараж","шиномонтаж","масл","колес","вождени","автосервис","права","car","каско","осаго","аккумулятор","тормоза","двигатель","запчаст","диск","кузов"];
+  const SOCIAL_SYNS = ["инстаграм","instagram","insta","тикток","tiktok","вконтакте","вк","vk","телеграм","telegram","ютуб","youtube","соцсет","лайк","пост","stories","сторис","reels","подписчик","публикаци","контент","блог","twitch","twitter","твиттер","discord","linkedin"];
+  const SPORT_SYNS  = ["спорт","тренировк","зал","фитнес","gym","fitness","бег","run","плавани","велосипед","йог","yoga","workout","качалк","качать","пробежк","силов","кардио","турник","отжимани","приседани","лыж","сноуборд","футбол","баскетбол","теннис","бокс"];
+  const BOOKS_SYNS  = ["книг","книж","читать","чтение","book","reading","литератур","роман","автор","библиотек","страниц","нон-фикшн","бестселлер","биографи","поэзи","стих","аудиокниг"];
+  const HEALTH_SYNS = ["здоровь","врач","доктор","больниц","аптек","лекарств","анализ","приём","прием","диета","витамин","health","медицин","клиник","зубной","стоматолог","терапевт","прививк","давлени","температур","процедур","массаж"];
+
+  const tagWork   = tasks.filter(t => t.done && matchTag(t.title, WORK_SYNS)).length;
+  const tagTravel = tasks.filter(t => t.done && matchTag(t.title, TRAVEL_SYNS)).length;
+  const tagMovie  = tasks.filter(t => t.done && matchTag(t.title, MOVIE_SYNS)).length;
+  const tagSeries = tasks.filter(t => t.done && matchTag(t.title, SERIES_SYNS)).length;
+  const tagHome   = tasks.filter(t => t.done && matchTag(t.title, HOME_SYNS)).length;
+  const tagFamily = tasks.filter(t => t.done && matchTag(t.title, FAMILY_SYNS)).length;
+  const tagDacha  = tasks.filter(t => t.done && matchTag(t.title, DACHA_SYNS)).length;
+  const tagCar    = tasks.filter(t => t.done && matchTag(t.title, CAR_SYNS)).length;
+  const tagSocial = tasks.filter(t => t.done && matchTag(t.title, SOCIAL_SYNS)).length;
+  const tagSport  = tasks.filter(t => t.done && matchTag(t.title, SPORT_SYNS)).length;
+  const tagBooks  = tasks.filter(t => t.done && matchTag(t.title, BOOKS_SYNS)).length;
+  const tagHealth = tasks.filter(t => t.done && matchTag(t.title, HEALTH_SYNS)).length;
+  const tagCatsUnlocked = [tagWork,tagTravel,tagMovie,tagSeries,tagHome,tagFamily,tagDacha,tagCar,tagSocial,tagSport,tagBooks,tagHealth].filter(c=>c>=1).length;
+
   const ACHIEVEMENTS=useMemo(()=>[
     // ── Задачи ──────────────────────────────────────────
     {icon:"⚡",label:"Первый шаг",        desc:"Выполни первую задачу",          done:completed>=1,   cat:"tasks"},
@@ -90,16 +122,97 @@ export default function ProfileScreen({ xp, tasks, events, challenges = [], nick
     {icon:"🌞",label:"Идеальный день",    desc:"Закрой все дневные задачи (мин. 3)", done:perfectDay, cat:"bonus"},
     {icon:"😴",label:"Воскресный герой",  desc:"Выполни задачу в воскресенье",   done:completedOnSunday, cat:"bonus"},
     {icon:"📆",label:"Активист",          desc:"Выполняй задачи 7 разных дней",  done:activeDays>=7, cat:"bonus"},
+
+    // ── Хэштег: Работа ─────────────────────────────────────────────
+    {icon:"💼",label:"Деловой человек",    desc:"Выполни рабочую задачу",                  done:tagWork>=1,  cat:"hashtag"},
+    {icon:"📊",label:"Трудяга",            desc:"Закрой 10 рабочих задач",                 done:tagWork>=10, cat:"hashtag"},
+    {icon:"🏢",label:"Карьерист",          desc:"Закрой 30 рабочих задач",                 done:tagWork>=30, cat:"hashtag"},
+    {icon:"🤵",label:"Топ-менеджер",       desc:"Закрой 100 рабочих задач",                done:tagWork>=100,cat:"hashtag"},
+
+    // ── Хэштег: Путешествия ────────────────────────────────────────
+    {icon:"🌍",label:"Первый перелёт",     desc:"Выполни задачу о путешествии",            done:tagTravel>=1,  cat:"hashtag"},
+    {icon:"🧳",label:"Бродяга",            desc:"Закрой 10 задач о путешествиях",          done:tagTravel>=10, cat:"hashtag"},
+    {icon:"✈️",label:"Вечный странник",    desc:"Закрой 30 задач о путешествиях",          done:tagTravel>=30, cat:"hashtag"},
+
+    // ── Хэштег: Фильмы ────────────────────────────────────────────
+    {icon:"🎬",label:"Киноман",            desc:"Посмотри первый фильм по задаче",         done:tagMovie>=1,  cat:"hashtag"},
+    {icon:"🍿",label:"Кинокритик",         desc:"Закрой 10 задач о фильмах",              done:tagMovie>=10, cat:"hashtag"},
+    {icon:"🎭",label:"Синефил",            desc:"Закрой 30 задач о фильмах",              done:tagMovie>=30, cat:"hashtag"},
+
+    // ── Хэштег: Сериалы ───────────────────────────────────────────
+    {icon:"📺",label:"Сериальщик",         desc:"Отметь первый просмотренный сериал",      done:tagSeries>=1,  cat:"hashtag"},
+    {icon:"🛋️",label:"Диванный эксперт",   desc:"Закрой 10 сериальных задач",             done:tagSeries>=10, cat:"hashtag"},
+    {icon:"🎥",label:"Нетфликс отдыхает",  desc:"Закрой 30 сериальных задач",             done:tagSeries>=30, cat:"hashtag"},
+
+    // ── Хэштег: Домашние дела ─────────────────────────────────────
+    {icon:"🧹",label:"Чистюля",            desc:"Выполни домашнее дело",                  done:tagHome>=1,  cat:"hashtag"},
+    {icon:"🏠",label:"Хозяйственный",      desc:"Закрой 10 домашних задач",               done:tagHome>=10, cat:"hashtag"},
+    {icon:"✨",label:"Идеальный дом",       desc:"Закрой 30 домашних задач",               done:tagHome>=30, cat:"hashtag"},
+
+    // ── Хэштег: Семья ─────────────────────────────────────────────
+    {icon:"👨‍👩‍👧",label:"Семьянин",           desc:"Выполни задачу для семьи",               done:tagFamily>=1,  cat:"hashtag"},
+    {icon:"❤️",label:"Опора семьи",         desc:"Закрой 10 семейных задач",               done:tagFamily>=10, cat:"hashtag"},
+    {icon:"👪",label:"Патриарх",            desc:"Закрой 30 семейных задач",               done:tagFamily>=30, cat:"hashtag"},
+
+    // ── Хэштег: Дача ──────────────────────────────────────────────
+    {icon:"🌱",label:"Огородник",           desc:"Выполни задачу на даче",                 done:tagDacha>=1,  cat:"hashtag"},
+    {icon:"🥕",label:"Агроном",             desc:"Закрой 10 дачных задач",                 done:tagDacha>=10, cat:"hashtag"},
+    {icon:"🌻",label:"Сельский житель",     desc:"Закрой 30 дачных задач",                 done:tagDacha>=30, cat:"hashtag"},
+
+    // ── Хэштег: Авто ──────────────────────────────────────────────
+    {icon:"🚗",label:"За рулём",            desc:"Выполни задачу об автомобиле",           done:tagCar>=1,  cat:"hashtag"},
+    {icon:"🔧",label:"Автолюбитель",        desc:"Закрой 10 задач об авто",                done:tagCar>=10, cat:"hashtag"},
+    {icon:"🏎️",label:"Автомеханик",         desc:"Закрой 30 задач об авто",                done:tagCar>=30, cat:"hashtag"},
+
+    // ── Хэштег: Соцсети ───────────────────────────────────────────
+    {icon:"📱",label:"Блогер",              desc:"Выполни задачу о соцсетях",              done:tagSocial>=1,  cat:"hashtag"},
+    {icon:"👍",label:"Инфлюенсер",          desc:"Закрой 10 задач о соцсетях",             done:tagSocial>=10, cat:"hashtag"},
+    {icon:"🌟",label:"Звезда интернета",    desc:"Закрой 30 задач о соцсетях",             done:tagSocial>=30, cat:"hashtag"},
+
+    // ── Хэштег: Спорт ─────────────────────────────────────────────
+    {icon:"🏃",label:"Физкультурник",       desc:"Выполни спортивную задачу",              done:tagSport>=1,  cat:"hashtag"},
+    {icon:"💪",label:"Атлет",               desc:"Закрой 10 спортивных задач",             done:tagSport>=10, cat:"hashtag"},
+    {icon:"🏆",label:"Чемпион по жизни",    desc:"Закрой 50 спортивных задач",             done:tagSport>=50, cat:"hashtag"},
+
+    // ── Хэштег: Книги ─────────────────────────────────────────────
+    {icon:"📚",label:"Читатель",            desc:"Выполни задачу о книгах",                done:tagBooks>=1,  cat:"hashtag"},
+    {icon:"📖",label:"Книжный клуб",        desc:"Закрой 10 книжных задач",                done:tagBooks>=10, cat:"hashtag"},
+    {icon:"🧠",label:"Интеллектуал",        desc:"Закрой 30 книжных задач",                done:tagBooks>=30, cat:"hashtag"},
+
+    // ── Хэштег: Здоровье ──────────────────────────────────────────
+    {icon:"🩺",label:"ЗОЖник",              desc:"Выполни задачу о здоровье",              done:tagHealth>=1,  cat:"hashtag"},
+    {icon:"💊",label:"Про своё здоровье",   desc:"Закрой 10 задач о здоровье",             done:tagHealth>=10, cat:"hashtag"},
+    {icon:"🏥",label:"Доктор себя",         desc:"Закрой 30 задач о здоровье",             done:tagHealth>=30, cat:"hashtag"},
+
+    // ── Хэштег: Мультикатегории ───────────────────────────────────
+    {icon:"🎨",label:"Разносторонний",      desc:"Задачи в 3 разных хэштег-темах",         done:tagCatsUnlocked>=3,  cat:"hashtag"},
+    {icon:"🌈",label:"Мастер на все руки",  desc:"Задачи в 6 разных хэштег-темах",         done:tagCatsUnlocked>=6,  cat:"hashtag"},
+    {icon:"🦄",label:"Человек-оркестр",     desc:"Задачи во всех 12 хэштег-темах",         done:tagCatsUnlocked>=12, cat:"hashtag"},
     {icon:"🦅",label:"Орёл",             desc:"Серия 14 дней",                  done:bestStreak>=14, cat:"streak"},
     {icon:"🏆",label:"Чемпион",          desc:"Серия 60 дней",                  done:bestStreak>=60, cat:"streak"},
     {icon:"💎",label:"Бриллиант",        desc:"Серия 200 дней",                 done:bestStreak>=200,cat:"streak"},
     {icon:"🧬",label:"ДНК продуктивности",desc:"Серия 500 дней",                done:bestStreak>=500,cat:"streak"},
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ],[completed,total,bestStreak,hasShopTask,shopItemsDone,allPeriodsCovered,perfectDay,completedOnSunday,activeDays,level,tasks,events]);
+  ],[completed,total,bestStreak,hasShopTask,shopItemsDone,allPeriodsCovered,perfectDay,completedOnSunday,activeDays,level,tasks,events,
+     tagWork,tagTravel,tagMovie,tagSeries,tagHome,tagFamily,tagDacha,tagCar,tagSocial,tagSport,tagBooks,tagHealth,tagCatsUnlocked]);
 
   const VISIBLE_ACHIEVEMENTS = 8;
   const [showAllAchievements, setShowAllAchievements] = useState(false);
+  const [achTab, setAchTab] = useState("all");
   const doneCount=ACHIEVEMENTS.filter(a=>a.done).length;
+
+  const ACH_TABS = [
+    {id:"all",     icon:"🏆", label:"Все"},
+    {id:"tasks",   icon:"✅", label:"Задачи"},
+    {id:"streak",  icon:"🔥", label:"Серии"},
+    {id:"level",   icon:"⭐", label:"Уровни"},
+    {id:"hashtag", icon:"🏷️", label:"Темы"},
+    {id:"events",  icon:"📅", label:"События"},
+    {id:"habit",   icon:"🔄", label:"Привычки"},
+    {id:"bonus",   icon:"🎁", label:"Бонус"},
+  ];
+
+  const filteredAch = achTab === "all" ? ACHIEVEMENTS : ACHIEVEMENTS.filter(a=>a.cat===achTab);
 
 
   return (
@@ -215,19 +328,47 @@ export default function ProfileScreen({ xp, tasks, events, challenges = [], nick
           <div style={{fontSize:12,color:T.gold,fontWeight:700}}>{doneCount}/{ACHIEVEMENTS.length}</div>
         </div>
         <XPBar progress={doneCount/ACHIEVEMENTS.length} color={T.gold} height={4}/>
-        <div style={{marginTop:14,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          {(showAllAchievements?ACHIEVEMENTS:ACHIEVEMENTS.slice(0,VISIBLE_ACHIEVEMENTS)).map(a=>(
-            <div key={a.label} style={{background:a.done?T.teal+"22":T.bg0,border:`1px solid ${a.done?T.teal+"66":T.brd}`,borderRadius:11,padding:"12px",transition:"all 0.3s"}}>
+        {/* Category tabs */}
+        <div style={{display:"flex",gap:6,overflowX:"auto",marginTop:12,marginBottom:12,paddingBottom:2,scrollbarWidth:"none"}}>
+          {ACH_TABS.map(tab=>{
+            const tabDone = (tab.id==="all"?ACHIEVEMENTS:ACHIEVEMENTS.filter(a=>a.cat===tab.id)).filter(a=>a.done).length;
+            const active = achTab===tab.id;
+            return (
+              <div key={tab.id} onClick={()=>{setAchTab(tab.id);setShowAllAchievements(false);}}
+                style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:20,cursor:"pointer",transition:"all 0.18s",
+                  background:active?T.purp:"transparent",
+                  border:`1.5px solid ${active?T.purp:T.brd}`,
+                  color:active?"#fff":T.sub,fontSize:11,fontWeight:active?700:500}}>
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+                {tabDone>0&&<span style={{background:active?"#ffffff33":T.purp+"33",color:active?"#fff":T.purpL,borderRadius:8,padding:"1px 5px",fontSize:10,fontWeight:700}}>{tabDone}</span>}
+              </div>
+            );
+          })}
+        </div>
+        {/* Hashtag category description */}
+        {achTab==="hashtag"&&(
+          <div style={{background:T.purp+"18",border:`1px solid ${T.purp}44`,borderRadius:10,padding:"10px 12px",marginBottom:10,fontSize:11,color:T.purpL,lineHeight:1.5}}>
+            🏷️ Ачивки за задачи по темам — работа, путешествия, фильмы и ещё 9 тем. Просто пиши #хэштег или ключевые слова в задаче!
+          </div>
+        )}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {(showAllAchievements?filteredAch:filteredAch.slice(0,VISIBLE_ACHIEVEMENTS)).map(a=>({...a,isHashtag:a.cat==="hashtag"})).map(a=>(
+            <div key={a.label} style={{background:a.done?(a.isHashtag?T.purp+"22":T.teal+"22"):(a.isHashtag?T.purp+"08":T.bg0),
+              border:`1px solid ${a.done?(a.isHashtag?T.purp+"66":T.teal+"66"):(a.isHashtag?T.purp+"22":T.brd)}`,
+              borderRadius:11,padding:"12px",transition:"all 0.3s"}}>
               <div style={{fontSize:22,marginBottom:4,filter:a.done?"none":"grayscale(0.8) opacity(0.4)"}}>{a.icon}</div>
-              <div style={{fontSize:12,fontWeight:700,color:a.done?T.teal:T.sub}}>{a.label}</div>
-              <div style={{fontSize:10,color:a.done?T.tealDim:T.dim,marginTop:3,lineHeight:1.4}}>{a.desc}</div>
+              <div style={{fontSize:12,fontWeight:700,color:a.done?(a.isHashtag?T.purpL:T.teal):T.sub}}>{a.label}</div>
+              <div style={{fontSize:10,color:a.done?(a.isHashtag?T.purp:T.tealDim):T.dim,marginTop:3,lineHeight:1.4}}>{a.desc}</div>
               {!a.done&&<div style={{fontSize:9,color:T.dim,marginTop:4,fontWeight:600,letterSpacing:"0.04em"}}>🔒 не открыто</div>}
-              {a.done&&<div style={{fontSize:9,color:T.teal,marginTop:4,fontWeight:700,letterSpacing:"0.04em"}}>✓ выполнено</div>}
+              {a.done&&<div style={{fontSize:9,color:a.isHashtag?T.purpL:T.teal,marginTop:4,fontWeight:700,letterSpacing:"0.04em"}}>✓ выполнено</div>}
             </div>
           ))}
-          <div onClick={()=>setShowAllAchievements(v=>!v)} style={{gridColumn:"1/-1",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",borderRadius:11,cursor:"pointer",background:T.bg0,border:`1px solid ${T.brd}`,marginTop:2}}>
-            <span style={{fontSize:12,color:T.purpL,fontWeight:700}}>{showAllAchievements?`▲ Свернуть`:`▼ Показать все (${ACHIEVEMENTS.length})`}</span>
-          </div>
+          {filteredAch.length > VISIBLE_ACHIEVEMENTS && (
+            <div onClick={()=>setShowAllAchievements(v=>!v)} style={{gridColumn:"1/-1",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",borderRadius:11,cursor:"pointer",background:T.bg0,border:`1px solid ${T.brd}`,marginTop:2}}>
+              <span style={{fontSize:12,color:T.purpL,fontWeight:700}}>{showAllAchievements?`▲ Свернуть`:`▼ Показать все (${filteredAch.length})`}</span>
+            </div>
+          )}
         </div>
       </div>
 
