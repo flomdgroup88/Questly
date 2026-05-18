@@ -45,7 +45,14 @@ async function initAdmin() {
         }
         return out;
       }
-      const serviceAccount = JSON.parse(sanitizeKeyJson(keyJson));
+      // Автодетект base64: если значение не начинается с '{',
+      // значит в Railway переменная была вставлена в base64-формате — декодируем.
+      const trimmed = keyJson.trimStart();
+      const rawJson = trimmed.startsWith("{")
+        ? keyJson
+        : Buffer.from(trimmed, "base64").toString("utf8");
+
+      const serviceAccount = JSON.parse(sanitizeKeyJson(rawJson));
       initializeApp({ credential: cert(serviceAccount) });
     }
     adminMessaging = getMessaging();
