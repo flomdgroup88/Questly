@@ -1,8 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { T } from "../theme.js";
 import { PERIODS, CHECKLIST_PRESETS, PRIORITIES } from "../constants.js";
 import { uid, defaultDueForPeriod, today } from "../utils";
 import { ModalOverlay, SectionLabel, StyledInput, Toggle, RecurPicker, Btn } from "../components/ui.jsx";
+
+const TEMPLATES_KEY = "questly_hashtag_templates";
+const MAX_TEMPLATES = 10;
+
+function loadTemplates() {
+  try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY)) || []; }
+  catch { return []; }
+}
+function saveTemplates(tpls) {
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(tpls));
+}
 
 export default function TaskModal({ onClose, onSave, onDelete, existing=null, initialDate=null, initialPeriod=null }) {
   const isEdit=!!existing;
@@ -26,6 +37,26 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
   const [note,setNote]=useState(existing?.note??"");
   const [hashtag,setHashtag]=useState(existing?.hashtag??"");
   const [hashtagColor,setHashtagColor]=useState(existing?.hashtagColor??"#06D6A0");
+  const [hashtagTemplates,setHashtagTemplates]=useState(loadTemplates);
+
+  const saveHashtagTemplate=()=>{
+    if(!hashtag.trim()) return;
+    const name=hashtag.trim().replace(/^#*/,"");
+    const existingTpl=hashtagTemplates.find(t=>t.name===name&&t.color===hashtagColor);
+    if(existingTpl) return;
+    const updated=[{name,color:hashtagColor},...hashtagTemplates].slice(0,MAX_TEMPLATES);
+    setHashtagTemplates(updated);
+    saveTemplates(updated);
+  };
+  const deleteHashtagTemplate=(idx)=>{
+    const updated=hashtagTemplates.filter((_,i)=>i!==idx);
+    setHashtagTemplates(updated);
+    saveTemplates(updated);
+  };
+  const applyTemplate=(tpl)=>{
+    setHashtag(tpl.name);
+    setHashtagColor(tpl.color);
+  };
 
   const HASHTAG_COLORS=[
     "#06D6A0","#38BDF8","#8B5CF6","#F5A623",
@@ -151,7 +182,7 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
           )}
         </div>
         {/* Color picker */}
-        <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:10}}>
           {HASHTAG_COLORS.map(c=>(
             <div key={c} onClick={()=>setHashtagColor(c)} style={{
               width:26,height:26,borderRadius:"50%",
@@ -163,6 +194,64 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
             }}/>
           ))}
         </div>
+
+        {/* Save template button */}
+        {hashtag.trim()&&(
+          <div style={{marginBottom:hashtagTemplates.length?10:0}}>
+            <div
+              onClick={saveHashtagTemplate}
+              style={{
+                display:"inline-flex",alignItems:"center",gap:5,
+                fontSize:11,fontWeight:700,padding:"5px 12px",
+                borderRadius:20,cursor:"pointer",
+                background:hashtagColor+"18",
+                color:hashtagColor,
+                border:`1px dashed ${hashtagColor}66`,
+                transition:"all 0.15s",
+                opacity:hashtagTemplates.find(t=>t.name===hashtag.trim().replace(/^#*/,"")&&t.color===hashtagColor)?0.4:1,
+              }}
+            >
+              {hashtagTemplates.find(t=>t.name===hashtag.trim().replace(/^#*/,"")&&t.color===hashtagColor)
+                ? "✓ Уже сохранён"
+                : `＋ Сохранить шаблон${hashtagTemplates.length>0?` (${hashtagTemplates.length}/${MAX_TEMPLATES})`:""}`
+              }
+            </div>
+          </div>
+        )}
+
+        {/* Saved templates */}
+        {hashtagTemplates.length>0&&(
+          <div>
+            <div style={{fontSize:11,color:T.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:7}}>
+              Шаблоны
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {hashtagTemplates.map((tpl,idx)=>(
+                <div key={idx} style={{display:"inline-flex",alignItems:"center",gap:0,borderRadius:20,overflow:"hidden",border:`1px solid ${tpl.color}44`,background:tpl.color+"14"}}>
+                  <span
+                    onClick={()=>applyTemplate(tpl)}
+                    style={{
+                      fontSize:12,fontWeight:700,padding:"4px 10px 4px 10px",
+                      color:tpl.color,cursor:"pointer",
+                      userSelect:"none",
+                    }}
+                  >#{tpl.name}</span>
+                  <span
+                    onClick={(e)=>{e.stopPropagation();deleteHashtagTemplate(idx);}}
+                    style={{
+                      fontSize:10,color:tpl.color,opacity:0.5,
+                      padding:"4px 8px 4px 0",
+                      cursor:"pointer",lineHeight:1,
+                      transition:"opacity 0.15s",
+                    }}
+                    onMouseEnter={e=>e.target.style.opacity="1"}
+                    onMouseLeave={e=>e.target.style.opacity="0.5"}
+                  >✕</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{marginBottom:14}}>

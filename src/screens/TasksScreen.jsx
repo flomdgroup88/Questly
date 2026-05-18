@@ -84,9 +84,68 @@ export default function TasksScreen({ tasks, onToggle, onSave, onDelete, onShopT
           </div>
         ):(
           <>
-            {filtered.filter(t=>!t.done).map(t=>(
-              <TaskCard key={t.id} task={t} onToggle={onToggle} onEdit={()=>setEdit(t)} onShopToggle={onShopToggle}/>
-            ))}
+            {(() => {
+              const active = filtered.filter(t => !t.done);
+
+              // Group by hashtag
+              const groups = {};
+              const noTag = [];
+              active.forEach(t => {
+                if (t.hashtag) {
+                  if (!groups[t.hashtag]) groups[t.hashtag] = { tasks: [], color: t.hashtagColor || "#06D6A0" };
+                  groups[t.hashtag].tasks.push(t);
+                } else {
+                  noTag.push(t);
+                }
+              });
+
+              const hasGroups = Object.keys(groups).length > 0;
+
+              return (
+                <>
+                  {Object.entries(groups).map(([tag, { tasks: gTasks, color }]) => (
+                    <div key={tag} style={{marginBottom: 16}}>
+                      <div style={{
+                        display:"flex", alignItems:"center", gap:8,
+                        marginBottom:8, padding:"6px 10px",
+                        borderRadius:10,
+                        background: color + "14",
+                        border: `1px solid ${color}33`,
+                      }}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0,boxShadow:`0 0 6px ${color}88`}}/>
+                        <span style={{fontSize:12,fontWeight:800,color,letterSpacing:"0.04em"}}>#{tag}</span>
+                        <span style={{fontSize:11,color:color,opacity:0.6,marginLeft:"auto",fontWeight:600}}>{gTasks.length}</span>
+                      </div>
+                      {gTasks.map(t => (
+                        <TaskCard key={t.id} task={t} onToggle={onToggle} onEdit={()=>setEdit(t)} onShopToggle={onShopToggle}/>
+                      ))}
+                    </div>
+                  ))}
+
+                  {noTag.length > 0 && (
+                    <div style={{marginBottom:16}}>
+                      {hasGroups && (
+                        <div style={{
+                          display:"flex", alignItems:"center", gap:8,
+                          marginBottom:8, padding:"6px 10px",
+                          borderRadius:10,
+                          background: T.bg2,
+                          border: `1px solid ${T.brd}`,
+                        }}>
+                          <div style={{width:8,height:8,borderRadius:"50%",background:T.dim,flexShrink:0}}/>
+                          <span style={{fontSize:12,fontWeight:800,color:T.sub,letterSpacing:"0.04em"}}>Без хэштега</span>
+                          <span style={{fontSize:11,color:T.dim,marginLeft:"auto",fontWeight:600}}>{noTag.length}</span>
+                        </div>
+                      )}
+                      {noTag.map(t => (
+                        <TaskCard key={t.id} task={t} onToggle={onToggle} onEdit={()=>setEdit(t)} onShopToggle={onShopToggle}/>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
             {filtered.some(t=>t.done)&&(
               <div style={{marginTop:12}}>
                 <div style={{fontSize:11,color:T.dim,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8,fontWeight:700}}>✓ Выполнено</div>
