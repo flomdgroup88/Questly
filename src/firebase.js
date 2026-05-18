@@ -68,10 +68,21 @@ export async function logOut() {
 // Ошибки, при которых retry бессмысленен (проблема не в сети)
 const NO_RETRY_CODES = new Set(["permission-denied", "unauthenticated", "not-found", "invalid-argument"]);
 
+// Firestore не принимает undefined — заменяем на null рекурсивно
+function stripUndefined(obj) {
+  if (Array.isArray(obj)) return obj.map(stripUndefined);
+  if (obj !== null && typeof obj === "object") {
+    return Object.fromEntries(
+      Object.entries(obj).map(([k, v]) => [k, v === undefined ? null : stripUndefined(v)])
+    );
+  }
+  return obj;
+}
+
 export async function cloudSaveUserData(userKey, data, { retries = 3, baseDelay = 1500 } = {}) {
   if (!userKey) return { ok: false, code: "no-key" };
 
-  const payload = { ...data, _savedAt: Date.now() };
+  const payload = stripUndefined({ ...data, _savedAt: Date.now() });
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
