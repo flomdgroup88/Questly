@@ -30,9 +30,23 @@ async function initAdmin() {
     const { getFirestore }                 = await import("firebase-admin/firestore");
 
     if (!getApps().length) {
-      // Railway иногда экранирует \n в private_key — нормализуем перед парсингом
-    const serviceAccount = JSON.parse(keyJson.replace(/\\n/g, "\n"));
-    initializeApp({ credential: cert(serviceAccount) });
+      // Railway вставляет реальные управляющие символы внутрь строк JSON.
+      // Проходим посимвольно и переэкранируем их только внутри строковых значений.
+      function sanitizeKeyJson(raw) {
+        let out = "", inStr = false, esc = false;
+        for (const ch of raw) {
+          if (esc)                          { out += ch; esc = false; continue; }
+          if (ch === "\\" && inStr)       { out += ch; esc = true;  continue; }
+          if (ch === "\"")                 { out += ch; inStr = !inStr; continue; }
+          if (inStr && ch === "\n")        { out += "\\n"; continue; }
+          if (inStr && ch === "\r")        { out += "\\r"; continue; }
+          if (inStr && ch === "\t")        { out += "\\t"; continue; }
+          out += ch;
+        }
+        return out;
+      }
+      const serviceAccount = JSON.parse(sanitizeKeyJson(keyJson));
+      initializeApp({ credential: cert(serviceAccount) });
     }
     adminMessaging = getMessaging();
     adminDb        = getFirestore();
