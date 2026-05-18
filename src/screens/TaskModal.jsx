@@ -59,9 +59,20 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
   };
 
   const HASHTAG_COLORS=[
-    "#06D6A0","#38BDF8","#8B5CF6","#F5A623",
-    "#F43F5E","#FF6B35","#A78BFA","#34D399",
-    "#FB923C","#60A5FA","#E879F9","#FBBF24",
+    // Зелёные
+    "#06D6A0","#22C55E","#84CC16",
+    // Синие/голубые
+    "#38BDF8","#3B82F6","#6366F1",
+    // Фиолетовые
+    "#8B5CF6","#A78BFA","#EC4899",
+    // Красные/розовые
+    "#F43F5E","#FB7185","#FF6B35",
+    // Оранжевые/жёлтые
+    "#F5A623","#FBBF24","#EAB308",
+    // Циановые/мятные
+    "#14B8A6","#34D399","#06B6D4",
+    // Экзотичные
+    "#F97316","#C026D3","#7C3AED","#0EA5E9",
   ];
 
   const pickPreset=p=>{
