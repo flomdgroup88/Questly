@@ -235,7 +235,16 @@ export function useAchievements({ tasks, xp, events, challenges, isLoading }: Ac
     // Ждём пока облако загрузится — иначе инициализация происходит на пустых
     // локальных данных, а потом все облачные ачивки приходят как «новые»
     // (актуально после переустановки PWA, когда localStorage очищен).
-    if (isLoading) return;
+    //
+    // ВАЖНО: сбрасываем initializedRef когда начинается новая загрузка.
+    // Без этого возникает race condition:
+    //   1. Firebase логинит анонимно → isLoading=false → initializedRef=true (пустые данные)
+    //   2. Пользователь входит с email → грузятся реальные данные
+    //   3. initializedRef уже true → все ачивки считаются новыми → спам тостами
+    if (isLoading) {
+      initializedRef.current = false;
+      return;
+    }
 
     const doneNow = achievements.filter(a => (a as any).done);
 
