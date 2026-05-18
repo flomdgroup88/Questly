@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { T } from "../theme.js";
 import { PERIODS, CHECKLIST_PRESETS } from "../constants.js";
-import { uid, defaultDueForPeriod, today } from "../utils";
+import { uid, defaultDueForPeriod, today, tomorrowStr } from "../utils";
 import { ModalOverlay, SectionLabel, StyledInput, Toggle, RecurPicker, Btn } from "../components/ui.jsx";
 
 const TEMPLATES_KEY = "questly_hashtag_templates";
@@ -162,12 +162,17 @@ export default function TaskModal({ onClose, onSave, onDelete, existing=null, in
       <div style={{marginBottom:14}}>
         <SectionLabel>Период</SectionLabel>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          {PERIODS.map(p=>(
-            <div key={p.id} onClick={()=>handlePeriodChange(p.id)} style={{padding:"10px 12px",borderRadius:11,cursor:"pointer",border:`2px solid ${period===p.id?p.accent:T.brd}`,background:period===p.id?p.accent+"20":T.bg0,transition:"all 0.15s"}}>
-              <div style={{fontSize:14,fontWeight:700,color:period===p.id?p.accent:T.sub}}>{p.icon} {p.label}</div>
-              <div style={{fontSize:11,color:period===p.id?p.accent+"AA":T.dim,marginTop:2}}>+{p.xp} XP</div>
-            </div>
-          ))}
+          {PERIODS.map(p=>{
+            const isTomorrowDay  = p.id==="day" && dueDate===tomorrowStr();
+            const displayLabel   = isTomorrowDay ? "Завтра" : p.label;
+            const displayIcon    = isTomorrowDay ? "🌅"     : p.icon;
+            return (
+              <div key={p.id} onClick={()=>handlePeriodChange(p.id)} style={{padding:"10px 12px",borderRadius:11,cursor:"pointer",border:`2px solid ${period===p.id?p.accent:T.brd}`,background:period===p.id?p.accent+"20":T.bg0,transition:"all 0.15s"}}>
+                <div style={{fontSize:14,fontWeight:700,color:period===p.id?p.accent:T.sub}}>{displayIcon} {displayLabel}</div>
+                <div style={{fontSize:11,color:period===p.id?p.accent+"AA":T.dim,marginTop:2}}>+{p.xp} XP</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
