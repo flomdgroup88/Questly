@@ -171,11 +171,13 @@ function AppInner() {
         <div style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", zIndex: 400, pointerEvents: "none", animation: "toastSlide 4s ease forwards", background: T.bg1, border: `1px solid ${T.rose}55`, borderRadius: 24, padding: "10px 18px", display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", boxShadow: "0 4px 20px #0008" }}>
           <span>📶</span><span style={{ fontSize: 13, color: T.sub }}>
             {syncErrorCode === "permission-denied"
-              ? "Ошибка доступа — попробуй перезайти в аккаунт"
+              ? "Ошибка доступа — перезайди в аккаунт"
               : syncErrorCode === "resource-exhausted"
-              ? "Лимит Firebase исчерпан — данные сохранятся позже"
+              ? "Лимит Firebase исчерпан — сохранится позже"
               : syncErrorCode === "unauthenticated"
-              ? "Сессия истекла — войди в аккаунт заново"
+              ? "Сессия истекла — войди заново"
+              : syncErrorCode && syncErrorCode !== "unknown"
+              ? `Ошибка синка: ${syncErrorCode}`
               : "Нет соединения — данные сохранены локально"}
           </span>
         </div>

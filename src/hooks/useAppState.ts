@@ -129,7 +129,7 @@ export function useAppState() {
   // Сеттеры от useState/useUser стабильны — deps пустой намеренно
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { syncStatus, syncIcon, isLoading, showOfflineToast } = useCloudSync({
+  const { syncStatus, syncIcon, isLoading, showOfflineToast, syncErrorCode } = useCloudSync({
     xp, tasks, events, nickname, challenges, sharedGoals,
     savedLocalTime: saved?._savedAt ?? 0,
     onCloudLoaded: handleCloudLoaded,
@@ -217,7 +217,7 @@ export function useAppState() {
     tasks, events, challenges, sharedGoals,
     xp, xpAnim, lvlUpAnim,
     // Синк
-    syncStatus, syncIcon, isLoading, showOfflineToast,
+    syncStatus, syncIcon, isLoading, showOfflineToast, syncErrorCode,
     // Уведомления
     notif,
     // Бонус за вход
