@@ -28,10 +28,25 @@ export const messaging = (typeof window !== "undefined" && "serviceWorker" in na
 //   • Уже залогинен (email) → Firebase UID (постоянный)
 //   • Telegram-пользователь → "tg_{id}"  (постоянный, работает на любом устройстве)
 //   • Остальные             → Firebase anonymous UID (хранится в IndexedDB браузера)
+
+// Ждём, пока Firebase восстановит сессию из IndexedDB (срабатывает один раз при старте).
+// auth.currentUser === null до этого момента — нельзя на него полагаться напрямую.
+function waitForAuthReady(): Promise<import("firebase/auth").User | null> {
+  return new Promise(resolve => {
+    const unsub = onAuthStateChanged(auth, user => {
+      unsub();
+      resolve(user ?? null);
+    });
+  });
+}
+
 export async function initUserSync() {
   try {
-    // 1. Уже залогинен через email — берём uid напрямую
-    if (auth.currentUser) return auth.currentUser.uid;
+    // Ждём восстановления сессии — только потом принимаем решения
+    const currentUser = await waitForAuthReady();
+
+    // 1. Уже залогинен (email или анонимный) — берём uid напрямую
+    if (currentUser) return currentUser.uid;
 
     // 2. Telegram
     const tgUser = typeof window !== "undefined" && window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -39,7 +54,7 @@ export async function initUserSync() {
       return `tg_${tgUser.id}`;          // ← устойчив к смене устройства
     }
 
-    // 3. Анонимный вход — Firebase сам кэширует токен в IndexedDB
+    // 3. Анонимный вход — только если реально никого нет
     const cred = await signInAnonymously(auth);
     return cred.user.uid;
   } catch (e) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, cloudSaveUserData, cloudLoadUserData, initUserSync } from "../firebase.js";
+import { auth, cloudSaveUserData, cloudLoadUserData } from "../firebase.js";
 import { autoRollover, spawnRecurring, today } from "../utils";
 
 const CLOUD_DEBOUNCE_MS = 4000;
@@ -49,9 +49,6 @@ export function useCloudSync({
 
   // ── Подписка на Auth: реагируем на вход / выход / восстановление сессии ──
   useEffect(() => {
-    // Запускаем анонимный вход заранее — иначе onAuthStateChanged может не сработать
-    initUserSync().catch(() => {});
-
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         // Не залогинен — сбрасываем ключ, показываем локальные данные
