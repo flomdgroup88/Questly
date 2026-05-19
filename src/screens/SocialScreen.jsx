@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { T } from "../theme.js";
 import { today, uid, mkCode } from "../utils";
 import { lvlOf } from "../utils";
-import { RANKS, RANK_ICONS } from "../constants.js";
+import { RANKS, RANK_ICONS, PERIODS } from "../constants.js";
 import { ModalOverlay, SectionLabel, StyledInput, RecurPicker, Btn, XPBar } from "../components/ui.jsx";
 import ShareSheet from "../components/ShareSheet.jsx";
 import { cloudSave, cloudFind, cloudAddParticipant, cloudSubscribeParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants,
@@ -501,24 +501,63 @@ function FriendCard({ friend, onRemove, onInvite, challenges }) {
   );
 }
 
+// ─── WEEKLY XP CALC ───────────────────────────────────────────────
+// Считает XP, заработанный за последние 7 дней, из doneHistory задач
+export function calcWeeklyXp(tasks) {
+  const cutoff = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().slice(0, 10);
+  })();
+  return tasks.reduce((total, task) => {
+    const taskXp = PERIODS.find(p => p.id === task.period)?.xp || 0;
+    const weekDones = (task.doneHistory || []).filter(d => d >= cutoff).length;
+    return total + weekDones * taskXp;
+  }, 0);
+}
+
 // ─── LEADERBOARD ──────────────────────────────────────────────────
 function Leaderboard({ me, friends }) {
+  const [mode, setMode] = useState("week"); // "week" | "all"
+
   const entries = [
-    { nickname: me.nickname, avatar: me.avatar, xp: me.xp || 0, isMe: true },
-    ...friends.map(f => ({ nickname: f.nickname, avatar: f.avatar || "👤", xp: f.xp || 0, isMe: false })),
-  ].sort((a, b) => b.xp - a.xp);
+    { nickname: me.nickname, avatar: me.avatar, xp: me.xp || 0, weeklyXp: me.weeklyXp || 0, isMe: true },
+    ...friends.map(f => ({ nickname: f.nickname, avatar: f.avatar || "👤", xp: f.xp || 0, weeklyXp: f.weeklyXp || 0, isMe: false })),
+  ].sort((a, b) => mode === "week" ? b.weeklyXp - a.weeklyXp : b.xp - a.xp);
 
   const medalColors = [T.gold, "#C0C0C0", "#CD7F32"];
   const medals = ["🥇", "🥈", "🥉"];
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <SectionLabel>🏆 ТАБЛИЦА ЛИДЕРОВ</SectionLabel>
+      {/* Заголовок + переключатель */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <SectionLabel style={{ margin: 0 }}>🏆 ТАБЛИЦА ЛИДЕРОВ</SectionLabel>
+        <div style={{ display: "flex", background: T.bg2, borderRadius: 10, padding: 3, border: `1px solid ${T.brd}`, gap: 2 }}>
+          {[["week", "За неделю"], ["all", "Всё время"]].map(([id, label]) => (
+            <div
+              key={id}
+              onClick={() => setMode(id)}
+              style={{
+                padding: "4px 10px", borderRadius: 7, cursor: "pointer",
+                fontSize: 11, fontWeight: 700,
+                background: mode === id ? T.purp : "transparent",
+                color: mode === id ? "#fff" : T.sub,
+                transition: "all 0.15s",
+              }}
+            >
+              {label}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {entries.map((e, i) => {
         const lvl = lvlOf(e.xp);
         const rank = RANKS[Math.min(lvl - 1, RANKS.length - 1)];
         const icon = RANK_ICONS[Math.min(lvl - 1, RANK_ICONS.length - 1)];
         const isTop3 = i < 3;
+        const displayXp = mode === "week" ? e.weeklyXp : e.xp;
         const borderColor = isTop3 ? (medalColors[i] + "55") : T.brd;
         const bgColor = isTop3 ? (medalColors[i] + "10") : T.bg0;
         return (
@@ -540,20 +579,31 @@ function Leaderboard({ me, friends }) {
                 {icon} {rank}
               </div>
             </div>
-            {/* Level + XP */}
+            {/* XP block */}
             <div style={{ textAlign: "right", flexShrink: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 900, color: T.gold }}>Ур. {lvl}</div>
-              <div style={{ fontSize: 11, color: T.sub, marginTop: 1 }}>⚡ {e.xp.toLocaleString()} XP</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: mode === "week" ? T.teal : T.gold }}>
+                {mode === "week" ? "+" : ""}⚡ {displayXp.toLocaleString()}
+              </div>
+              <div style={{ fontSize: 10, color: T.dim, marginTop: 1 }}>
+                {mode === "week" ? "за 7 дней" : `Ур. ${lvl}`}
+              </div>
             </div>
           </div>
         );
       })}
+
+      {/* Подсказка когда у всех 0 за неделю */}
+      {mode === "week" && entries.every(e => e.weeklyXp === 0) && (
+        <div style={{ textAlign: "center", padding: "12px 0 4px", fontSize: 12, color: T.dim }}>
+          Выполняй квесты, чтобы появиться в недельном рейтинге ⚡
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── FRIENDS TAB ──────────────────────────────────────────────────
-function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp }) {
+function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [] }) {
   const [friends, setFriends] = useState([]);
   const [freshProfiles, setFreshProfiles] = useState({});
   const [loading, setLoading] = useState(true);
@@ -568,14 +618,18 @@ function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp }) {
   // Публикуем свой профиль и загружаем друзей
   useEffect(() => {
     if (!userKey || !nickname) { setLoading(false); return; }
-    cloudPublishProfile(userKey, nickname, userAvatar, challenges, myXp);
+    const myWeeklyXp = calcWeeklyXp(tasks);
+    cloudPublishProfile(userKey, nickname, userAvatar, challenges, myXp, myWeeklyXp);
     cloudGetFriends(userKey).then(list => { setFriends(list); setLoading(false); });
   }, [userKey, nickname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Обновляем профиль при изменении соревнований
   useEffect(() => {
-    if (userKey && nickname) cloudPublishProfile(userKey, nickname, userAvatar, challenges, myXp);
-  }, [challenges, userKey, nickname, userAvatar]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (userKey && nickname) {
+      const myWeeklyXp = calcWeeklyXp(tasks);
+      cloudPublishProfile(userKey, nickname, userAvatar, challenges, myXp, myWeeklyXp);
+    }
+  }, [challenges, userKey, nickname, userAvatar, myXp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAdd = async (friendData) => {
     if (!userKey) return;
@@ -653,7 +707,7 @@ function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp }) {
       ) : (
         <>
           <Leaderboard
-            me={{ nickname, avatar: userAvatar || "🧙", xp: myXp || 0 }}
+            me={{ nickname, avatar: userAvatar || "🧙", xp: myXp || 0, weeklyXp: calcWeeklyXp(tasks) }}
             friends={enrichedFriends}
           />
           <SectionLabel>ДРУЗЬЯ ({friends.length})</SectionLabel>
@@ -682,7 +736,7 @@ function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp }) {
 }
 
 // ─── SOCIAL SCREEN ────────────────────────────────────────────────
-export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg, nickname, userAvatar, xp }) {
+export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg, nickname, userAvatar, xp, tasks = [] }) {
   const [tab,setTab]=useState("challenges");
   const [showNewCh,setNewCh]=useState(false);
   const [showNewSg,setNewSg]=useState(false);
@@ -775,7 +829,7 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
       <div style={{flex:1,overflowY:"auto",padding:"0 16px",WebkitOverflowScrolling:"touch"}}>
         {tab==="challenges"&&(challenges.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🏆</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет соревнований</div><div style={{fontSize:13,marginTop:6}}>Создай серию и поделись с другом</div></div>:challenges.map(ch=><ChallengeCard key={ch.id} ch={ch} myDisplayName={myDisplayName} onOpen={()=>setDetailCh(ch)} onShare={()=>setShare({code:ch.shareCode,title:ch.title})}/>))}
         {tab==="goals"&&(sharedGoals.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🎯</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет общих целей</div><div style={{fontSize:13,marginTop:6}}>Поделись списком задач с другом</div></div>:sharedGoals.map(sg=><GoalCard key={sg.id} sg={sg} myDisplayName={myDisplayName} onOpen={()=>setDetailSg(sg)}/>))}
-        {tab==="friends"&&<FriendsTab nickname={nickname} userAvatar={userAvatar} challenges={challenges} onShare={setShare} myXp={xp}/>}
+        {tab==="friends"&&<FriendsTab nickname={nickname} userAvatar={userAvatar} challenges={challenges} onShare={setShare} myXp={xp} tasks={tasks}/>}
         <div style={{height:20}}/>
       </div>
       {showNewCh&&<NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch);setNewCh(false);}} nickname={nickname}/>}
