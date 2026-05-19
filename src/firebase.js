@@ -31,7 +31,7 @@ export const messaging = (typeof window !== "undefined" && "serviceWorker" in na
 
 // Ждём, пока Firebase восстановит сессию из IndexedDB (срабатывает один раз при старте).
 // auth.currentUser === null до этого момента — нельзя на него полагаться напрямую.
-function waitForAuthReady(): Promise<import("firebase/auth").User | null> {
+function waitForAuthReady() {
   return new Promise(resolve => {
     const unsub = onAuthStateChanged(auth, user => {
       unsub();
