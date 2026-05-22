@@ -799,7 +799,7 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
   const joinCh=chData=>{
     const exists=challenges.find(c=>c.id===chData.id||c.shareCode===chData.shareCode);
     if(exists) onUpdateCh(chData.id,ch=>({...ch,joined:true,_myName:myDisplayName}));
-    else onCreateCh({...chData,myStreak:0,myHistory:[],joined:true,_myName:myDisplayName});
+    else onCreateCh({...chData,myStreak:0,myHistory:[],joined:true,_myName:myDisplayName},myDisplayName,userAvatar);
   };
   const joinSg=sgData=>{
     const exists=sharedGoals.find(s=>s.id===sgData.id||s.shareCode===sgData.shareCode);
@@ -832,7 +832,7 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
         {tab==="friends"&&<FriendsTab nickname={nickname} userAvatar={userAvatar} challenges={challenges} onShare={setShare} myXp={xp} tasks={tasks}/>}
         <div style={{height:20}}/>
       </div>
-      {showNewCh&&<NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch);setNewCh(false);}} nickname={nickname}/>}
+      {showNewCh&&<NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch,myDisplayName,userAvatar);setNewCh(false);}} nickname={nickname}/>}
       {showNewSg&&<NewSharedGoalModal onClose={()=>setNewSg(false)} onCreate={sg=>{onCreateSg(sg);setNewSg(false);}} nickname={nickname}/>}
       {showJoin&&<JoinModal challenges={challenges} sharedGoals={sharedGoals} onClose={()=>setJoin(false)} onJoinCh={joinCh} onJoinSg={joinSg} nickname={nickname} userAvatar={userAvatar}/>}
       {shareItem&&<ShareSheet code={shareItem.code} title={shareItem.title} onClose={()=>setShare(null)}/>}
