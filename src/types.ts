@@ -115,9 +115,18 @@ export interface AppState {
   _savedAt: number;
 }
 
+export interface Friend {
+  userKey: string;
+  nickname: string;
+  avatar: string;
+  topChallenges: { emoji: string; title: string; streak: number }[];
+  addedAt?: number;
+}
+
 export interface SocialState {
   challenges: Challenge[];
   sharedGoals: SharedGoal[];
+  friends: Friend[];
 }
 
 // ─── ОБЛАЧНЫЙ СИНК ───────────────────────────────────────────────
