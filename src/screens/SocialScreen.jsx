@@ -729,6 +729,8 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[challengeKeys]);
 
+  const MAX_HISTORY_DAYS = 180;
+
   const completeCh=async(id)=>{
     let prevCh=null;
     // 1. Сразу обновляем локальный стейт — UI реагирует мгновенно
@@ -736,20 +738,26 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
       if(ch.myHistory.includes(today())) return ch;
       prevCh=ch; // запоминаем для отката
       const newHistory=[...(ch.myHistory),today()];
+      // Стрик считаем из полного массива ДО обрезки —
+      // иначе длинные серии (> MAX_HISTORY_DAYS) сломаются при расчёте.
       let streak=0;
       const sorted=[...newHistory].sort();
       if(sorted[sorted.length-1]===today()){
         let cur=today();streak=1;
         while(true){const d=new Date(cur);d.setDate(d.getDate()-1);const prev=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(sorted.includes(prev)){streak++;cur=prev;}else break;}
       }
+      // Обрезаем до MAX_HISTORY_DAYS перед сохранением — и в облако, и в локальный стейт.
+      const trimmedHistory = newHistory.length > MAX_HISTORY_DAYS
+        ? newHistory.slice(-MAX_HISTORY_DAYS)
+        : newHistory;
       // 2. Синкаем с облаком в фоне, не блокируя UI
       if(ch.shareCode){
-        cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,newHistory,myTgId,userAvatar)
+        cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,trimmedHistory,myTgId,userAvatar)
           .then(ok=>{
             if(!ok&&prevCh) onUpdateCh(id,()=>prevCh); // 3. Откат при ошибке
           });
       }
-      return {...ch,myHistory:newHistory,myStreak:streak};
+      return {...ch,myHistory:trimmedHistory,myStreak:streak};
     });
   };
 
