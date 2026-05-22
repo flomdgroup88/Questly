@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, logOut, cloudSave } from "../firebase.js";
+import { auth, logOut, cloudSave, cloudAddFriend, cloudRemoveFriend } from "../firebase.js";
 import {
   lvlOf, today,
   loadState, saveState, loadSocial, saveSocial,
@@ -24,7 +24,7 @@ import { useTasks }           from "./useTasks.js";
 import { useCloudSync }       from "./useCloudSync.js";
 import { useNotifications }   from "./useNotifications.js";
 import { useMidnightRollover } from "./useMidnightRollover.js";
-import type { Task, QuestlyEvent, Challenge, SharedGoal } from "../types.js";
+import type { Task, QuestlyEvent, Challenge, SharedGoal, Friend } from "../types.js";
 import { useUser } from "../context/UserContext.js";
 
 export function useAppState() {
@@ -91,6 +91,7 @@ export function useAppState() {
   const [events,      setEvts]       = useState<QuestlyEvent[]>(saved?.events      ?? []);
   const [challenges,  setChallenges] = useState<Challenge[]>   (savedSoc?.challenges  ?? []);
   const [sharedGoals, setSharedGoals] = useState<SharedGoal[]> (savedSoc?.sharedGoals ?? []);
+  const [friends,     setFriends]    = useState<Friend[]>      (savedSoc?.friends     ?? []);
 
   // ── UI-стейт ──────────────────────────────────────────────────────
   const [tab,             setTab]           = useState("overview");
@@ -114,13 +115,13 @@ export function useAppState() {
   // ── Сохранение в localStorage ─────────────────────────────────────
   useEffect(() => {
     saveState({ xp, tasks, events, nickname, userAvatar, _savedAt: Date.now() });
-    saveSocial({ challenges, sharedGoals });
-  }, [xp, tasks, events, nickname, userAvatar, challenges, sharedGoals]);
+    saveSocial({ challenges, sharedGoals, friends });
+  }, [xp, tasks, events, nickname, userAvatar, challenges, sharedGoals, friends]);
   // nickname/userAvatar теперь сохраняются и здесь, и через persistUserFields в UserContext (дублирование безопасно)
 
   // ── Облачный синк ─────────────────────────────────────────────────
   const handleCloudLoaded = useCallback(({
-    tasks: t, events: e, xp: x, challenges: ch, sharedGoals: sg,
+    tasks: t, events: e, xp: x, challenges: ch, sharedGoals: sg, friends: fr,
     nickname: n, userAvatar: av,
   }: Partial<ReturnType<typeof loadState> & ReturnType<typeof loadSocial> & { nickname: string; userAvatar: string }>) => {
     if (t)           setTasks(t);
@@ -128,6 +129,7 @@ export function useAppState() {
     if (x != null)   setXP(x);
     if (ch)          setChallenges(ch);
     if (sg)          setSharedGoals(sg);
+    if (fr)          setFriends(fr);
     // Восстанавливаем никнейм и аватар из облака (критично для поиска по никнейму)
     if (n)           setNickname(n);
     if (av)          setUserAvatar(av);
@@ -135,7 +137,7 @@ export function useAppState() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { syncStatus, syncIcon, isLoading, showOfflineToast, syncErrorCode } = useCloudSync({
-    xp, tasks, events, nickname, challenges, sharedGoals,
+    xp, tasks, events, nickname, challenges, sharedGoals, friends,
     savedLocalTime: saved?._savedAt ?? 0,
     onCloudLoaded: handleCloudLoaded,
   });
@@ -215,11 +217,24 @@ export function useAppState() {
       .then(ok => { if (!ok) console.error("⚠️ Не удалось сохранить цель."); });
   }, []);
 
+  // ── Друзья ────────────────────────────────────────────────────────
+  const handleAddFriend = useCallback(async (friendData: Friend) => {
+    if (!notifUserKey) return;
+    const ok = await cloudAddFriend(notifUserKey, friendData);
+    if (ok) setFriends(p => [...p.filter(f => f.userKey !== friendData.userKey), friendData]);
+  }, [notifUserKey]);
+
+  const handleRemoveFriend = useCallback(async (friendKey: string) => {
+    if (!notifUserKey) return;
+    await cloudRemoveFriend(notifUserKey, friendKey);
+    setFriends(p => p.filter(f => f.userKey !== friendKey));
+  }, [notifUserKey]);
+
   return {
     // Auth
     authReady, firebaseUser, handleLogout,
     // Данные
-    tasks, events, challenges, sharedGoals,
+    tasks, events, challenges, sharedGoals, friends,
     xp, xpAnim, lvlUpAnim,
     // Синк
     syncStatus, syncIcon, isLoading, showOfflineToast, syncErrorCode,
@@ -242,5 +257,8 @@ export function useAppState() {
     handleUpdateCh, handleUpdateSg,
     handleDeleteCh, handleDeleteSg,
     handleCreateCh, handleCreateSg,
+    // Друзья
+    userKey: notifUserKey,
+    handleAddFriend, handleRemoveFriend,
   };
 }
