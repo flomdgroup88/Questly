@@ -101,7 +101,7 @@ export async function cloudSaveUserData(userKey, data, { retries = 3, baseDelay 
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      await setDoc(doc(db, "userData", userKey), payload);
+      await setDoc(doc(db, "userData", userKey), payload, { merge: true });
       return { ok: true };
     } catch (e) {
       const code = e.code ?? "unknown";
