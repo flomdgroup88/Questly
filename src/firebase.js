@@ -188,11 +188,20 @@ export async function cloudGetParticipants(shareCode) {
   }
 }
 
+// Документ Firestore ограничен 1 МБ — храним не более 180 дат на участника.
+// Этого хватает для отображения (сетка 4 недели = 28 дней) и расчёта стрика.
+const MAX_HISTORY_DAYS = 180;
+
 export async function cloudUpdateMyProgress(shareCode, name, streak, history, tgId, avatar) {
   // runTransaction гарантирует атомарность: если два участника отмечают выполнение
   // одновременно, Firestore повторит транзакцию и никто не потеряет свои данные.
   try {
     const ref = doc(db, "challenges", shareCode);
+    // Обрезаем историю перед записью — берём последние MAX_HISTORY_DAYS дат.
+    // Стрик уже посчитан снаружи на полном массиве, поэтому обрезка его не ломает.
+    const trimmedHistory = history.length > MAX_HISTORY_DAYS
+      ? history.slice(-MAX_HISTORY_DAYS)
+      : history;
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists()) return;
@@ -201,7 +210,7 @@ export async function cloudUpdateMyProgress(shareCode, name, streak, history, tg
         ? parts.findIndex(p => p.tgId ? p.tgId === tgId : p.name === name)
         : parts.findIndex(p => p.name === name);
       const existing = idx >= 0 ? parts[idx] : null;
-      const entry = { name, avatar: avatar || (existing?.avatar) || "👤", streak, history, lastCompleted: history[history.length-1] || null, ...(tgId?{tgId}:{}) };
+      const entry = { name, avatar: avatar || (existing?.avatar) || "👤", streak, history: trimmedHistory, lastCompleted: trimmedHistory[trimmedHistory.length-1] || null, ...(tgId?{tgId}:{}) };
       if (idx >= 0) parts[idx] = entry; else parts.push(entry);
       tx.update(ref, { participants: parts });
     });
