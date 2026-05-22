@@ -430,17 +430,11 @@ function AddFriendModal({ onClose, onAdd, myUserKey, myNickname }) {
 
 // ─── FRIEND CARD ──────────────────────────────────────────────────
 function FriendCard({ friend, onRemove, onInvite, challenges }) {
-  const [freshProfile, setFreshProfile] = useState(null);
   const [removing, setRemoving] = useState(false);
 
-  // Подписываемся на свежий профиль
-  useEffect(() => {
-    if (!friend.nickname) return;
-    const unsub = cloudSubscribeFriendProfile(friend.nickname, (p) => setFreshProfile(p));
-    return unsub;
-  }, [friend.nickname]);
-
-  const profile = freshProfile || friend;
+  // Профиль уже обогащён свежими данными из FriendsTab (через enrichedFriends),
+  // поэтому отдельная подписка здесь не нужна — она была дублирующей.
+  const profile = friend;
   const topChallenges = profile.topChallenges || [];
 
   return (
