@@ -6,7 +6,8 @@ import { RANKS, RANK_ICONS, PERIODS } from "../constants.js";
 import { ModalOverlay, SectionLabel, StyledInput, RecurPicker, Btn, XPBar } from "../components/ui.jsx";
 import ShareSheet from "../components/ShareSheet.jsx";
 import { cloudSave, cloudFind, cloudAddParticipant, cloudSubscribeParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants,
-  cloudPublishProfile, cloudFindByNickname, cloudSubscribeFriendProfile } from "../firebase.js";
+  cloudPublishProfile, cloudFindByNickname, cloudSubscribeFriendProfile,
+  cloudPublishActivity, cloudSubscribeActivityFeed, cloudAddReaction } from "../firebase.js";
 
 // ─── NEW CHALLENGE MODAL ──────────────────────────────────────────
 function NewChallengeModal({ onClose, onCreate, nickname }) {
@@ -595,9 +596,81 @@ function Leaderboard({ me, friends }) {
   );
 }
 
+// ─── ACTIVITY FEED ────────────────────────────────────────────────
+const REACTION_EMOJIS = ["🔥","💪","👏","😍","🚀"];
+
+function timeAgo(ts) {
+  const mins = Math.floor((Date.now() - ts) / 60000);
+  if (mins < 1)  return "только что";
+  if (mins < 60) return `${mins} мин назад`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `${hrs} ч назад`;
+  return `${Math.floor(hrs / 24)} дн назад`;
+}
+
+function ActivityFeed({ events, myNickname, onReact }) {
+  if (events.length === 0) return null;
+  return (
+    <div style={{marginBottom:20}}>
+      <SectionLabel>⚡ АКТИВНОСТЬ ДРУЗЕЙ</SectionLabel>
+      {events.slice(0,15).map(e=>(
+        <div key={e.id} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"12px 14px",marginBottom:8}}>
+          {/* Заголовок события */}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+            <div style={{fontSize:26,width:42,height:42,borderRadius:12,background:T.sky+"22",border:`1px solid ${T.sky}33`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {e._friendAvatar}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,color:T.text,lineHeight:1.4}}>
+                <span style={{fontWeight:800,color:T.sky}}>{e._friendName}</span>
+                <span style={{color:T.sub}}> закрыл(а) </span>
+                <span style={{fontWeight:700}}>{e.challengeEmoji} {e.challengeTitle}</span>
+              </div>
+              <div style={{fontSize:11,color:T.sub,marginTop:3,display:"flex",alignItems:"center",gap:6}}>
+                <span style={{color:"#FF6B35",fontWeight:700}}>🔥 серия {e.streak} {e.streak===1?"день":e.streak<5?"дня":"дней"}</span>
+                <span>·</span>
+                <span>{timeAgo(e.timestamp)}</span>
+              </div>
+            </div>
+          </div>
+          {/* Реакции */}
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {REACTION_EMOJIS.map(emoji=>{
+              const reactors = e.reactions?.[emoji] || [];
+              const mine = reactors.includes(myNickname);
+              return (
+                <div
+                  key={emoji}
+                  onClick={()=>onReact(e._friendKey,e.id,emoji)}
+                  style={{
+                    fontSize:14,padding:"4px 10px",borderRadius:20,cursor:"pointer",
+                    display:"flex",alignItems:"center",gap:4,userSelect:"none",
+                    background: mine ? T.purp+"33" : T.bg0,
+                    border:`1px solid ${mine ? T.purp+"66" : T.brd}`,
+                    color: mine ? T.purpL : T.sub,
+                    transition:"all 0.15s",
+                  }}
+                >
+                  {emoji}
+                  {reactors.length>0 && (
+                    <span style={{fontSize:11,fontWeight:700,color:mine?T.purpL:T.dim}}>
+                      {reactors.length}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── FRIENDS TAB ──────────────────────────────────────────────────
 function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [], friends, userKey, onAddFriend, onRemoveFriend }) {
   const [freshProfiles, setFreshProfiles] = useState({});
+  const [feedEvents,    setFeedEvents]    = useState([]);
   const [showAdd, setShowAdd] = useState(false);
 
   // Публикуем свой профиль при монтировании и при изменении данных
@@ -618,6 +691,47 @@ function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [
     });
     return () => unsubs.forEach(u => u());
   }, [friends.map(f => f.nickname).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Подписываемся на ленту активности каждого друга
+  useEffect(() => {
+    if (friends.length === 0) return;
+    const unsubs = friends.map(f => {
+      if (!f.userKey) return () => {};
+      return cloudSubscribeActivityFeed(f.userKey, events => {
+        setFeedEvents(prev => {
+          // Убираем старые события этого друга, добавляем свежие с тегами
+          const others  = prev.filter(e => e._friendKey !== f.userKey);
+          const tagged  = events.map(e => ({
+            ...e,
+            _friendKey:    f.userKey,
+            _friendName:   f.nickname   || "Друг",
+            _friendAvatar: f.avatar     || "👤",
+          }));
+          return [...others, ...tagged].sort((a,b) => b.timestamp - a.timestamp).slice(0,30);
+        });
+      });
+    });
+    return () => unsubs.forEach(u => u());
+  }, [friends.map(f => f.userKey).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Реакция на событие в ленте
+  const handleReact = (friendKey, eventId, emoji) => {
+    if (!nickname) return;
+    cloudAddReaction(friendKey, eventId, emoji, nickname).catch(() => {});
+    // Оптимистичное обновление — UI реагирует мгновенно, не ждёт Firestore
+    setFeedEvents(prev => prev.map(e => {
+      if (e.id !== eventId || e._friendKey !== friendKey) return e;
+      const reactions = { ...(e.reactions || {}) };
+      const existing  = reactions[emoji] || [];
+      if (existing.includes(nickname)) {
+        const next = existing.filter(n => n !== nickname);
+        if (next.length === 0) delete reactions[emoji]; else reactions[emoji] = next;
+      } else {
+        reactions[emoji] = [...existing, nickname];
+      }
+      return { ...e, reactions };
+    }));
+  };
 
   // Merge friends with fresh profile data (for XP)
   const enrichedFriends = friends.map(f => ({ ...f, ...(freshProfiles[f.nickname] || {}) }));
@@ -667,6 +781,7 @@ function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [
             me={{ nickname, avatar: userAvatar || "🧙", xp: myXp || 0, weeklyXp: calcWeeklyXp(tasks) }}
             friends={enrichedFriends}
           />
+          <ActivityFeed events={feedEvents} myNickname={nickname} onReact={handleReact} />
           <SectionLabel>ДРУЗЬЯ ({friends.length})</SectionLabel>
           {enrichedFriends.map(f => (
             <FriendCard
@@ -755,6 +870,17 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
         cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,trimmedHistory,myTgId,userAvatar)
           .then(ok=>{
             if(!ok&&prevCh) onUpdateCh(id,()=>prevCh); // 3. Откат при ошибке
+            // 4. Публикуем в ленту активности — только при успехе
+            if(ok && userKey) {
+              cloudPublishActivity(userKey, {
+                id: uid(),
+                challengeEmoji: ch.emoji,
+                challengeTitle: ch.title,
+                streak,
+                timestamp: Date.now(),
+                reactions: {},
+              }).catch(()=>{});
+            }
           });
       }
       return {...ch,myHistory:trimmedHistory,myStreak:streak};
