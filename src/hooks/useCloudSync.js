@@ -26,6 +26,7 @@ export function useCloudSync({
   nickname,
   challenges,
   sharedGoals,
+  friends,
   savedLocalTime,
   onCloudLoaded,
 }) {
@@ -133,6 +134,7 @@ export function useCloudSync({
         nickname,
         challenges,
         sharedGoals,
+        friends,
         _savedAt: Date.now(),
       });
 
@@ -164,7 +166,7 @@ export function useCloudSync({
       clearTimeout(maxWaitTimerRef.current);
       maxWaitTimerRef.current = null;
     };
-  }, [xp, tasks, events, nickname, challenges, sharedGoals]);
+  }, [xp, tasks, events, nickname, challenges, sharedGoals, friends]);
 
   const syncIcon =
     syncStatus === "saving" ? "⏳" :
