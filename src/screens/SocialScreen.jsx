@@ -6,8 +6,7 @@ import { RANKS, RANK_ICONS, PERIODS } from "../constants.js";
 import { ModalOverlay, SectionLabel, StyledInput, RecurPicker, Btn, XPBar } from "../components/ui.jsx";
 import ShareSheet from "../components/ShareSheet.jsx";
 import { cloudSave, cloudFind, cloudAddParticipant, cloudSubscribeParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants,
-  cloudPublishProfile, cloudFindByNickname, cloudGetFriends, cloudAddFriend, cloudRemoveFriend, cloudSubscribeFriendProfile,
-  initUserSync } from "../firebase.js";
+  cloudPublishProfile, cloudFindByNickname, cloudSubscribeFriendProfile } from "../firebase.js";
 
 // ─── NEW CHALLENGE MODAL ──────────────────────────────────────────
 function NewChallengeModal({ onClose, onCreate, nickname }) {
@@ -603,45 +602,16 @@ function Leaderboard({ me, friends }) {
 }
 
 // ─── FRIENDS TAB ──────────────────────────────────────────────────
-function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [] }) {
-  const [friends, setFriends] = useState([]);
+function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [], friends, userKey, onAddFriend, onRemoveFriend }) {
   const [freshProfiles, setFreshProfiles] = useState({});
-  const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [userKey, setUserKey] = useState(null);
 
-  // Получаем userKey один раз
+  // Публикуем свой профиль при монтировании и при изменении данных
   useEffect(() => {
-    initUserSync().then(key => { if (key) setUserKey(key); });
-  }, []);
-
-  // Публикуем свой профиль и загружаем друзей
-  useEffect(() => {
-    if (!userKey || !nickname) { setLoading(false); return; }
+    if (!userKey || !nickname) return;
     const myWeeklyXp = calcWeeklyXp(tasks);
     cloudPublishProfile(userKey, nickname, userAvatar, challenges, myXp, myWeeklyXp);
-    cloudGetFriends(userKey).then(list => { setFriends(list); setLoading(false); });
-  }, [userKey, nickname]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Обновляем профиль при изменении соревнований
-  useEffect(() => {
-    if (userKey && nickname) {
-      const myWeeklyXp = calcWeeklyXp(tasks);
-      cloudPublishProfile(userKey, nickname, userAvatar, challenges, myXp, myWeeklyXp);
-    }
   }, [challenges, userKey, nickname, userAvatar, myXp]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleAdd = async (friendData) => {
-    if (!userKey) return;
-    const ok = await cloudAddFriend(userKey, friendData);
-    if (ok) setFriends(p => [...p.filter(f => f.userKey !== friendData.userKey), friendData]);
-  };
-
-  const handleRemove = async (friendKey) => {
-    if (!userKey) return;
-    await cloudRemoveFriend(userKey, friendKey);
-    setFriends(p => p.filter(f => f.userKey !== friendKey));
-  };
 
   // Subscribe to live profiles of all friends for leaderboard
   useEffect(() => {
@@ -657,13 +627,6 @@ function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [
 
   // Merge friends with fresh profile data (for XP)
   const enrichedFriends = friends.map(f => ({ ...f, ...(freshProfiles[f.nickname] || {}) }));
-
-  if (loading) return (
-    <div style={{textAlign:"center",padding:"60px 0",color:T.dim}}>
-      <div style={{fontSize:32,marginBottom:10,animation:"sparkle 1.5s linear infinite"}}>⚡</div>
-      <div style={{fontSize:13,color:T.sub}}>Загружаем друзей…</div>
-    </div>
-  );
 
   if (!nickname) return (
     <div style={{textAlign:"center",padding:"60px 24px",color:T.dim}}>
@@ -715,7 +678,7 @@ function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [
             <FriendCard
               key={f.userKey}
               friend={f}
-              onRemove={handleRemove}
+              onRemove={onRemoveFriend}
               onInvite={(ch) => onShare({ code: ch.shareCode, title: ch.title })}
               challenges={challenges}
             />
@@ -726,7 +689,7 @@ function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [
       {showAdd && (
         <AddFriendModal
           onClose={() => setShowAdd(false)}
-          onAdd={handleAdd}
+          onAdd={onAddFriend}
           myUserKey={userKey}
           myNickname={nickname}
         />
@@ -736,7 +699,7 @@ function FriendsTab({ nickname, userAvatar, challenges, onShare, myXp, tasks = [
 }
 
 // ─── SOCIAL SCREEN ────────────────────────────────────────────────
-export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg, nickname, userAvatar, xp, tasks = [] }) {
+export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUpdateSg, onDeleteCh, onDeleteSg, onCreateCh, onCreateSg, nickname, userAvatar, xp, tasks = [], friends = [], userKey, onAddFriend, onRemoveFriend }) {
   const [tab,setTab]=useState("challenges");
   const [showNewCh,setNewCh]=useState(false);
   const [showNewSg,setNewSg]=useState(false);
@@ -829,7 +792,7 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
       <div style={{flex:1,overflowY:"auto",padding:"0 16px",WebkitOverflowScrolling:"touch"}}>
         {tab==="challenges"&&(challenges.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🏆</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет соревнований</div><div style={{fontSize:13,marginTop:6}}>Создай серию и поделись с другом</div></div>:challenges.map(ch=><ChallengeCard key={ch.id} ch={ch} myDisplayName={myDisplayName} onOpen={()=>setDetailCh(ch)} onShare={()=>setShare({code:ch.shareCode,title:ch.title})}/>))}
         {tab==="goals"&&(sharedGoals.length===0?<div style={{textAlign:"center",padding:"48px 0",color:T.dim}}><div style={{fontSize:44,marginBottom:12}}>🎯</div><div style={{fontSize:15,fontWeight:600,color:T.sub}}>Нет общих целей</div><div style={{fontSize:13,marginTop:6}}>Поделись списком задач с другом</div></div>:sharedGoals.map(sg=><GoalCard key={sg.id} sg={sg} myDisplayName={myDisplayName} onOpen={()=>setDetailSg(sg)}/>))}
-        {tab==="friends"&&<FriendsTab nickname={nickname} userAvatar={userAvatar} challenges={challenges} onShare={setShare} myXp={xp} tasks={tasks}/>}
+        {tab==="friends"&&<FriendsTab nickname={nickname} userAvatar={userAvatar} challenges={challenges} onShare={setShare} myXp={xp} tasks={tasks} friends={friends} userKey={userKey} onAddFriend={onAddFriend} onRemoveFriend={onRemoveFriend}/>}
         <div style={{height:20}}/>
       </div>
       {showNewCh&&<NewChallengeModal onClose={()=>setNewCh(false)} onCreate={ch=>{onCreateCh(ch,myDisplayName,userAvatar);setNewCh(false);}} nickname={nickname}/>}
