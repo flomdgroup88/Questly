@@ -214,18 +214,25 @@ export async function cloudUpdateMyProgress(shareCode, name, streak, history, tg
 
 export async function cloudAddParticipant(type, shareCode, participant) {
   try {
-    const col = type === "challenge" ? "challenges" : "sharedGoals";
     if (type === "challenge") {
-      const snap = await getDoc(doc(db, col, shareCode));
-      if (!snap.exists()) return false;
-      const parts = snap.data().participants || [];
-      const alreadyExists = participant.tgId
-        ? parts.some(p => p.tgId ? p.tgId === participant.tgId : p.name === participant.name)
-        : parts.some(p => p.name === participant.name);
-      if (alreadyExists) return true;
-      await updateDoc(doc(db, col, shareCode), { participants: [...parts, participant] });
+      // runTransaction гарантирует атомарность: если двое вступают одновременно,
+      // Firestore повторит транзакцию и оба участника попадут в список —
+      // никто не затрёт данные другого (в отличие от простого getDoc + updateDoc).
+      const ref = doc(db, "challenges", shareCode);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error("challenge-not-found");
+        const parts = snap.data().participants || [];
+        const alreadyExists = participant.tgId
+          ? parts.some(p => p.tgId ? p.tgId === participant.tgId : p.name === participant.name)
+          : parts.some(p => p.name === participant.name);
+        if (!alreadyExists) {
+          tx.update(ref, { participants: [...parts, participant] });
+        }
+      });
     } else {
-      await updateDoc(doc(db, col, shareCode), { participants: arrayUnion(participant) });
+      // sharedGoals: участник — просто строка, arrayUnion атомарен сам по себе
+      await updateDoc(doc(db, "sharedGoals", shareCode), { participants: arrayUnion(participant) });
     }
     return true;
   } catch (e) {
