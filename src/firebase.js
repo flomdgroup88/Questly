@@ -444,3 +444,66 @@ export function cloudSubscribeFriendProfile(nickname, callback) {
     (err)  => console.warn("cloudSubscribeFriendProfile error:", err)
   );
 }
+
+// ─── ACTIVITY FEED ────────────────────────────────────────────────
+// Документ activityFeed/{userKey} хранит последние MAX_FEED_EVENTS событий.
+// Структура события: { id, challengeEmoji, challengeTitle, streak, timestamp, reactions:{} }
+const MAX_FEED_EVENTS = 20;
+
+// Публикует событие (выполнение соревнования) в ленту пользователя.
+export async function cloudPublishActivity(userKey, event) {
+  if (!userKey) return false;
+  try {
+    const ref = doc(db, "activityFeed", userKey);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const prev = snap.exists() ? (snap.data().events || []) : [];
+      tx.set(ref, { events: [event, ...prev].slice(0, MAX_FEED_EVENTS) });
+    });
+    return true;
+  } catch (e) {
+    console.warn("cloudPublishActivity error:", e);
+    return false;
+  }
+}
+
+// Подписка на ленту событий пользователя в реальном времени.
+export function cloudSubscribeActivityFeed(userKey, callback) {
+  const ref = doc(db, "activityFeed", userKey);
+  return onSnapshot(ref,
+    snap => callback(snap.exists() ? (snap.data().events || []) : []),
+    err  => console.warn("cloudSubscribeActivityFeed error:", err)
+  );
+}
+
+// Добавляет или убирает эмодзи-реакцию на событие в ленте друга.
+// Повторный тап на ту же реакцию — убирает её (toggle).
+export async function cloudAddReaction(friendKey, eventId, emoji, myNickname) {
+  if (!friendKey) return false;
+  try {
+    const ref = doc(db, "activityFeed", friendKey);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return;
+      const events = snap.data().events || [];
+      const updated = events.map(e => {
+        if (e.id !== eventId) return e;
+        const reactions = { ...(e.reactions || {}) };
+        const existing = reactions[emoji] || [];
+        if (existing.includes(myNickname)) {
+          // toggle off
+          const next = existing.filter(n => n !== myNickname);
+          if (next.length === 0) delete reactions[emoji]; else reactions[emoji] = next;
+        } else {
+          reactions[emoji] = [...existing, myNickname];
+        }
+        return { ...e, reactions };
+      });
+      tx.update(ref, { events: updated });
+    });
+    return true;
+  } catch (e) {
+    console.warn("cloudAddReaction error:", e);
+    return false;
+  }
+}
