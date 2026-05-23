@@ -86,6 +86,7 @@ function AppInner() {
     handleDeleteCh, handleDeleteSg,
     handleCreateCh, handleCreateSg,
     userKey,
+    friends,
     handleAddFriend, handleRemoveFriend,
   } = useAppState();
 
