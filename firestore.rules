@@ -26,5 +26,13 @@ service cloud.firestore {
       allow read: if true;                  // поиск открыт всем
       allow write: if true;                 // пишет только сам пользователь (Telegram/anon)
     }
+
+    // ── Лента активности для вкладки "Друзья" ────────────────────
+    // Каждый пользователь пишет в свой документ, читают все —
+    // чтобы друзья видели события и могли ставить реакции.
+    match /activityFeed/{userKey} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }
