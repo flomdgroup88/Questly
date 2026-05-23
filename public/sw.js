@@ -17,6 +17,15 @@ precacheAndRoute(self.__WB_MANIFEST);
 // Удаляем кэши от старых версий SW
 cleanupOutdatedCaches();
 
+// ─── Установка: немедленно пропускаем ожидание ───────────────────────────────
+// Без skipWaiting() новый SW застревает в состоянии "waiting" до тех пор,
+// пока пользователь не закроет ВСЕ вкладки с приложением.
+// В Telegram Mini App это никогда не происходит — WebView живёт в фоне.
+// skipWaiting() заставляет новый SW активироваться сразу после установки.
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
 // ─── Активация: сразу берём управление без ожидания перезагрузки ─────────────
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
