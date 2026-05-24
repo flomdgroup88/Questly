@@ -1,0 +1,41 @@
+[Unit]
+Description=PolyBot — Polymarket Automated Trading Bot
+Documentation=https://github.com/youruser/polybot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=polybot
+Group=polybot
+WorkingDirectory=/opt/polybot/backend
+EnvironmentFile=/opt/polybot/.env
+
+# Use the built JS output
+ExecStart=/usr/bin/node dist/server.js
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# Resource limits
+LimitNOFILE=65535
+MemoryMax=256M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=polybot
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/opt/polybot/data /opt/polybot/logs
+
+[Install]
+WantedBy=multi-user.target

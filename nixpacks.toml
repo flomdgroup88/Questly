@@ -1,0 +1,20 @@
+# Nixpacks build config for Railway
+# Tells Railway exactly how to install deps and build both backend + dashboard
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
+
+[phases.install]
+cmds = [
+  "cd backend && npm install",
+  "cd dashboard && npm install"
+]
+
+[phases.build]
+cmds = [
+  "cd backend && npm run build",
+  "cd dashboard && npm run build"
+]
+
+[start]
+cmd = "node backend/dist/server.js"
