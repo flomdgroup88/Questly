@@ -180,9 +180,35 @@ app.get("/api/widget/:userKey", async (req, res) => {
 
     const totalToday  = tasks.length;
     const doneToday   = tasks.filter(t => t.done).length;
-    const pendingList = tasks
-      .filter(t => !t.done)
-      .map(t => ({ id: t.id, title: t.title, xp: t.xp, priority: t.priority ?? "normal" }));
+
+    // Группируем активные задачи по хэштегу (как в приложении)
+    const active = tasks.filter(t => !t.done);
+    const groups = {};
+    const noTag  = [];
+    active.forEach(t => {
+      if (t.hashtag) {
+        if (!groups[t.hashtag]) groups[t.hashtag] = { tasks: [], color: t.hashtagColor || "#06D6A0" };
+        groups[t.hashtag].tasks.push(t);
+      } else {
+        noTag.push(t);
+      }
+    });
+
+    // Собираем плоский список в порядке: сначала группы, потом без тега
+    const pendingList = [
+      ...Object.entries(groups).flatMap(([tag, { tasks: gTasks, color }]) =>
+        gTasks.map(t => ({
+          id: t.id, title: t.title, xp: t.xp,
+          priority: t.priority ?? "normal",
+          hashtag: tag, hashtagColor: color,
+        }))
+      ),
+      ...noTag.map(t => ({
+        id: t.id, title: t.title, xp: t.xp,
+        priority: t.priority ?? "normal",
+        hashtag: null, hashtagColor: null,
+      })),
+    ];
 
     res.json({
       nickname:  data.nickname  ?? "Герой",
