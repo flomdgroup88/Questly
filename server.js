@@ -176,7 +176,7 @@ app.get("/api/widget/:userKey", async (req, res) => {
 
     // Задачи на сегодня
     const todayStr = new Date().toISOString().slice(0, 10);
-    const tasks = (data.tasks ?? []).filter(t => t.dueDate === todayStr);
+    const tasks = (data.tasks ?? []).filter(t => t.dueDate === todayStr && t.period === "day");
 
     const totalToday  = tasks.length;
     const doneToday   = tasks.filter(t => t.done).length;
