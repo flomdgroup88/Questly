@@ -152,6 +152,79 @@ app.post("/api/test-notify", async (req, res) => {
   return res.status(500).json({ error: "send failed" });
 });
 
+// ─── Widget API ───────────────────────────────────────────────────
+// GET /api/widget/:userKey
+// Возвращает задачи на сегодня для виджета Scriptable на iPhone.
+// Защита: сравниваем заголовок X-Widget-Token с полем widgetToken в Firestore.
+// Если widgetToken ещё не задан — токен не требуется (первый запрос).
+app.get("/api/widget/:userKey", async (req, res) => {
+  if (!adminDb) return res.status(503).json({ error: "Firestore не подключён" });
+
+  const { userKey } = req.params;
+  const token = req.headers["x-widget-token"] ?? req.query.token ?? "";
+
+  try {
+    const snap = await adminDb.collection("userData").doc(userKey).get();
+    if (!snap.exists) return res.status(404).json({ error: "Пользователь не найден" });
+
+    const data = snap.data();
+
+    // Проверка токена (если он уже сохранён)
+    if (data.widgetToken && data.widgetToken !== token) {
+      return res.status(401).json({ error: "Неверный токен" });
+    }
+
+    // Задачи на сегодня
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const tasks = (data.tasks ?? []).filter(t => t.dueDate === todayStr);
+
+    const totalToday  = tasks.length;
+    const doneToday   = tasks.filter(t => t.done).length;
+    const pendingList = tasks
+      .filter(t => !t.done)
+      .map(t => ({ id: t.id, title: t.title, xp: t.xp, priority: t.priority ?? "normal" }));
+
+    res.json({
+      nickname:  data.nickname  ?? "Герой",
+      xp:        data.xp        ?? 0,
+      date:      todayStr,
+      totalToday,
+      doneToday,
+      pending:   pendingList,
+    });
+  } catch (e) {
+    console.error("Widget API error:", e.message);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// POST /api/widget/:userKey/token  — сохранить/обновить widgetToken
+// Body: { "token": "...", "currentToken": "..." }
+app.post("/api/widget/:userKey/token", async (req, res) => {
+  if (!adminDb) return res.status(503).json({ error: "Firestore не подключён" });
+
+  const { userKey } = req.params;
+  const { token, currentToken = "" } = req.body ?? {};
+  if (!token) return res.status(400).json({ error: "token обязателен" });
+
+  try {
+    const snap = await adminDb.collection("userData").doc(userKey).get();
+    if (!snap.exists) return res.status(404).json({ error: "Пользователь не найден" });
+
+    const data = snap.data();
+    // Проверяем текущий токен перед заменой
+    if (data.widgetToken && data.widgetToken !== currentToken) {
+      return res.status(401).json({ error: "Неверный currentToken" });
+    }
+
+    await adminDb.collection("userData").doc(userKey).update({ widgetToken: token });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Widget token error:", e.message);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 // SPA fallback
 app.get("*", (_req, res) => {
   res.sendFile(join(__dirname, "dist", "index.html"));
