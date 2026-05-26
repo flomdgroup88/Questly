@@ -174,8 +174,11 @@ app.get("/api/widget/:userKey", async (req, res) => {
       return res.status(401).json({ error: "Неверный токен" });
     }
 
-    // Задачи на сегодня
-    const todayStr = new Date().toISOString().slice(0, 10);
+    // Задачи на сегодня — таймзона из query (?tz=3) или из профиля, иначе Москва UTC+3
+    const qTz = parseFloat(req.query.tz);
+    const tzOffset = !isNaN(qTz) ? qTz : (typeof data.tzOffset === "number" ? data.tzOffset : 3);
+    const nowLocal = new Date(Date.now() + tzOffset * 60 * 60 * 1000);
+    const todayStr = nowLocal.toISOString().slice(0, 10);
     const tasks = (data.tasks ?? []).filter(t => t.dueDate === todayStr && t.period === "day");
 
     const totalToday  = tasks.length;
