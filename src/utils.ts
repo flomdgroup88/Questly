@@ -200,7 +200,9 @@ export const spawnRecurring = (tasks: Task[], events: QuestlyEvent[], day: strin
           inheritedStreak = cont ? (lastDone.streak || 0) : 0;
         }
       }
-      next.unshift({ ...t, id: uid(), templateId: tplId, done: false, dueDate: day, streak: inheritedStreak, rolledOver: false });
+      // doneHistory не копируем — каждый новый экземпляр начинает с чистой историей,
+      // чтобы calendar не показывал одну и ту же дату выполнения в нескольких экземплярах.
+      next.unshift({ ...t, id: uid(), templateId: tplId, done: false, dueDate: day, streak: inheritedStreak, rolledOver: false, doneHistory: [] });
     }
   });
 
