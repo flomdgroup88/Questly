@@ -92,16 +92,26 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
   });
 
   // Показываем только дневные задачи (period === "day"):
-  // • их dueDate совпадает с выбранным днём
-  // • либо задача выполнена именно в этот день (doneHistory)
+  // • их dueDate совпадает с выбранным днём (запланировано на этот день)
+  // • либо задача была выполнена в этот день (doneHistory) — даже если изначально
+  //   ставилась на другой день и переносилась несколько раз.
+  //   Источник истины — doneHistory, а не поле done (которое отражает текущее
+  //   состояние активного экземпляра, а не факт выполнения в конкретную дату).
   const selTaskIds=new Set();
-  const selTasks=tasks.filter(t=>{
+  const selTasksRaw=tasks.filter(t=>{
     if(selTaskIds.has(t.id)) return false;
     if(t.period !== "day") return false;
-    const inPeriod = isDateInTaskPeriod(t, selDate);
-    const byDone   = t.done && (t.doneHistory||[]).includes(selDate);
-    if(inPeriod||byDone){ selTaskIds.add(t.id); return true; }
+    const inPeriod        = isDateInTaskPeriod(t, selDate);        // dueDate === selDate
+    const completedOnDate = (t.doneHistory||[]).includes(selDate); // реально выполнена в этот день
+    if(inPeriod||completedOnDate){ selTaskIds.add(t.id); return true; }
     return false;
+  });
+  // Задачи, найденные только через doneHistory (а не dueDate), показываем как выполненные.
+  // Нахождение в doneHistory = задача была отмечена именно в selDate.
+  const selTasks=selTasksRaw.map(t=>{
+    const completedOnDate=(t.doneHistory||[]).includes(selDate);
+    if(completedOnDate&&!t.done) return {...t,done:true};
+    return t;
   }).sort((a,b)=>Number(a.done)-Number(b.done));
 
   return (
