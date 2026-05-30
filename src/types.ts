@@ -6,8 +6,8 @@
 /** Период задачи: день / неделя / месяц / год */
 export type Period = "day" | "week" | "month" | "year";
 
-/** Тип повторения: ежедневно / еженедельно / ежегодно / без повторения */
-export type RecurType = "day" | "week" | "year" | "";
+/** Тип повторения: ежедневно / еженедельно / ежемесячно / ежегодно / без повторения */
+export type RecurType = "day" | "week" | "month" | "year" | "";
 
 // ─── ЗАДАЧИ ──────────────────────────────────────────────────────
 export interface ShopItem {
@@ -24,6 +24,8 @@ export interface Task {
   done: boolean;
   /** Дата дедлайна в формате "YYYY-MM-DD" */
   dueDate: string;
+  /** Даты ("YYYY-MM-DD"), когда задача была отмечена выполненной */
+  doneHistory?: string[];
   recurring: boolean;
   recurType: RecurType;
   streakEnabled: boolean;
