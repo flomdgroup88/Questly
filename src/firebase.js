@@ -268,6 +268,40 @@ export async function cloudDeduplicateParticipants(shareCode) {
   }
 }
 
+// ─── SOCIAL: Общие цели (реальная синхронизация) ─────────────────
+
+// Подписка в реальном времени на общую цель (пункты + участники).
+// callback получает весь документ цели при каждом изменении в Firestore.
+// Возвращает функцию unsubscribe — вызови её при размонтировании.
+export function cloudSubscribeGoal(shareCode, callback) {
+  const ref = doc(db, "sharedGoals", shareCode);
+  return onSnapshot(
+    ref,
+    (snap) => { if (snap.exists()) callback(snap.data()); },
+    (err) => console.warn("cloudSubscribeGoal error:", err)
+  );
+}
+
+// Изменение одного пункта цели через транзакцию — патчим ТОЛЬКО целевой
+// пункт по id, поэтому одновременные правки разных пунктов двумя людьми
+// не затирают друг друга (last-write-wins только в пределах одного пункта).
+// patch — частичный объект, напр. { done:true, doneBy:"Аня" } или { assignedTo:"Аня" }.
+export async function cloudSetGoalItem(shareCode, itemId, patch) {
+  try {
+    const ref = doc(db, "sharedGoals", shareCode);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return;
+      const items = (snap.data().items || []).map(it => it.id === itemId ? { ...it, ...patch } : it);
+      tx.update(ref, { items });
+    });
+    return true;
+  } catch (e) {
+    console.warn("Firebase setGoalItem error:", e);
+    return false;
+  }
+}
+
 // ─── FCM: Запрос разрешения и получение токена ───────────────────
 // VAPID-ключ (публичный) берётся из Firebase Console →
 //   Project Settings → Cloud Messaging → Web Push certificates → Key pair
