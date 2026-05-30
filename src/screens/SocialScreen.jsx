@@ -7,7 +7,47 @@ import { ModalOverlay, SectionLabel, StyledInput, RecurPicker, Btn, XPBar } from
 import ShareSheet from "../components/ShareSheet.jsx";
 import { cloudSave, cloudFind, cloudAddParticipant, cloudSubscribeParticipants, cloudUpdateMyProgress, cloudDeduplicateParticipants,
   cloudPublishProfile, cloudFindByNickname, cloudSubscribeFriendProfile,
-  cloudPublishActivity, cloudSubscribeActivityFeed, cloudAddReaction } from "../firebase.js";
+  cloudPublishActivity, cloudSubscribeActivityFeed, cloudAddReaction,
+  cloudSubscribeGoal, cloudSetGoalItem } from "../firebase.js";
+
+// ─── ПЕРИОД-ЗАВИСИМЫЕ ХЕЛПЕРЫ ДЛЯ СОРЕВНОВАНИЙ ────────────────────
+// Раньше стрик и «отметка» считались всегда по календарным дням, из-за чего
+// еженедельные/ежемесячные/ежегодные бои работали неправильно (стрик не рос
+// дальше 1, отметку можно было ставить каждый день). Эти хелперы делают логику
+// зависимой от recurType.
+
+// Канонический ключ периода, в который попадает дата.
+const periodKeyOf = (dateStr, rt) => {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (rt === "week") { // ключ = понедельник этой недели
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  }
+  if (rt === "month") return `${y}-${String(m).padStart(2, "0")}`;
+  if (rt === "year")  return `${y}`;
+  return dateStr; // day
+};
+// Ключ предыдущего периода (шаг на один период назад).
+const prevPeriodKey = (key, rt) => {
+  if (rt === "year")  return String(Number(key) - 1);
+  if (rt === "month") { const [y, m] = key.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+  const [y, m, d] = key.split("-").map(Number); const dt = new Date(y, m - 1, d); dt.setDate(dt.getDate() - (rt === "week" ? 7 : 1));
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+};
+// Отмечено ли в текущем периоде.
+const doneThisPeriod = (history, rt) => { const cur = periodKeyOf(today(), rt); return (history || []).some(d => periodKeyOf(d, rt) === cur); };
+// Стрик = число подряд идущих периодов с отметкой, заканчивая текущим.
+const streakOf = (history, rt) => {
+  const done = new Set((history || []).map(d => periodKeyOf(d, rt)));
+  let key = periodKeyOf(today(), rt);
+  if (!done.has(key)) return 0;
+  let streak = 0;
+  while (done.has(key)) { streak++; key = prevPeriodKey(key, rt); }
+  return streak;
+};
+const periodWord  = rt => rt === "week" ? "на этой неделе" : rt === "month" ? "в этом месяце" : rt === "year" ? "в этом году" : "сегодня";
+const recurLabel  = rt => rt === "week" ? "Еженедельно" : rt === "month" ? "Ежемесячно" : rt === "year" ? "Ежегодно" : "Ежедневно";
 
 // ─── NEW CHALLENGE MODAL ──────────────────────────────────────────
 function NewChallengeModal({ onClose, onCreate, nickname }) {
@@ -145,12 +185,12 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname,
   const tgUser=typeof window!=="undefined"&&window.Telegram?.WebApp?.initDataUnsafe?.user;
   const myName=nickname||tgUser?.first_name||ch._myName||"Ты";
   const myTgId=tgUser?.id?String(tgUser.id):null;
-  const myDoneToday=ch.myHistory.includes(today());
-  const period=ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно";
+  const myDoneToday=doneThisPeriod(ch.myHistory,ch.recurType);
+  const period=recurLabel(ch.recurType);
   const [freshParts,setFreshParts]=useState(ch.participants||[]);
   const [syncing,setSyncing]=useState(false);
   // Оптимистик: локальный флаг — кнопка реагирует мгновенно, не ждёт родителя
-  const [doneToday,setDoneToday]=useState(ch.myHistory.includes(today()));
+  const [doneToday,setDoneToday]=useState(doneThisPeriod(ch.myHistory,ch.recurType));
   const [saving,setSaving]=useState(false);
   const [saveErr,setSaveErr]=useState(false);
 
@@ -240,7 +280,7 @@ function ChallengeDetail({ ch, onClose, onComplete, onShare, onDelete, nickname,
             setTimeout(onClose,600);
           }}
         >
-          {saving?"⏳ Сохраняем…":doneToday?"✓ Сделано сегодня":"Отметить сегодня ✓"}
+          {saving?"⏳ Сохраняем…":doneToday?`✓ Сделано ${periodWord(ch.recurType)}`:`Отметить ${periodWord(ch.recurType)} ✓`}
         </Btn>
       </div>
       <Btn variant="danger" onClick={()=>{onDelete(ch.id);onClose();}}>🗑 Удалить соревнование</Btn>
@@ -293,7 +333,8 @@ function SharedGoalDetail({ sg, onClose, onToggleItem, onAssign, onShare, onDele
 // ─── CHALLENGE CARD (top-level — стабильный тип, без remount при re-render) ──
 function ChallengeCard({ ch, myDisplayName, onOpen, onShare }) {
   const allParts=[{name:myDisplayName,streak:ch.myStreak,isMe:true},...(ch.participants||[])];
-  const myDoneToday=ch.myHistory.includes(today());
+  const myDoneToday=doneThisPeriod(ch.myHistory,ch.recurType);
+  const pWord=periodWord(ch.recurType);
   return (
     <div onClick={onOpen} style={{background:T.bg2,borderRadius:14,border:`1px solid ${T.brd}`,padding:"14px 16px",marginBottom:10,cursor:"pointer"}}>
       <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
@@ -301,12 +342,12 @@ function ChallengeCard({ ch, myDisplayName, onOpen, onShare }) {
         <div style={{flex:1}}>
           <div style={{fontSize:15,fontWeight:700,color:T.text}}>{ch.title}</div>
           {ch.desc&&<div style={{fontSize:12,color:T.sub,marginTop:2,lineHeight:1.4}}>{ch.desc}</div>}
-          <div style={{fontSize:11,color:T.dim,marginTop:3}}>{ch.recurType==="day"?"Ежедневно":ch.recurType==="week"?"Еженедельно":"Ежегодно"}</div>
+          <div style={{fontSize:11,color:T.dim,marginTop:3}}>{recurLabel(ch.recurType)}</div>
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
           {myDoneToday
-            ?<span style={{fontSize:11,fontWeight:700,color:T.teal,background:T.teal+"22",padding:"3px 9px",borderRadius:20}}>✓ сегодня</span>
-            :<span style={{fontSize:11,color:T.rose,background:T.rose+"22",padding:"3px 9px",borderRadius:20}}>сегодня</span>}
+            ?<span style={{fontSize:11,fontWeight:700,color:T.teal,background:T.teal+"22",padding:"3px 9px",borderRadius:20}}>✓ {pWord}</span>
+            :<span style={{fontSize:11,color:T.rose,background:T.rose+"22",padding:"3px 9px",borderRadius:20}}>{pWord}</span>}
           {ch.shareCode&&<div onClick={e=>{e.stopPropagation();onShare();}} style={{fontSize:11,color:T.sky,background:T.sky+"18",padding:"3px 9px",borderRadius:20,border:`1px solid ${T.sky}33`,cursor:"pointer",whiteSpace:"nowrap"}}>🔗 Позвать</div>}
         </div>
       </div>
@@ -844,47 +885,58 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[challengeKeys]);
 
+  // Реальное время для целей: тянем пункты + участников из облака.
+  // Раньше подписки не было вовсе — отметки друга не доходили.
+  const goalKeys=sharedGoals.map(s=>s.id).join(",");
+  useEffect(()=>{
+    const active=sharedGoals.filter(s=>s.shareCode);
+    if(active.length===0) return;
+    const unsubs=active.map(sg=>
+      cloudSubscribeGoal(sg.shareCode,(data)=>{
+        if(!data) return;
+        onUpdateSg(sg.id,s=>({
+          ...s,
+          items:        Array.isArray(data.items)        ? data.items        : s.items,
+          participants: Array.isArray(data.participants) ? data.participants : s.participants,
+        }));
+      })
+    );
+    return ()=>unsubs.forEach(unsub=>unsub());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[goalKeys]);
+
   const MAX_HISTORY_DAYS = 180;
 
   const completeCh=async(id)=>{
-    let prevCh=null;
-    // 1. Сразу обновляем локальный стейт — UI реагирует мгновенно
-    onUpdateCh(id,ch=>{
-      if(ch.myHistory.includes(today())) return ch;
-      prevCh=ch; // запоминаем для отката
-      const newHistory=[...(ch.myHistory),today()];
-      // Стрик считаем из полного массива ДО обрезки —
-      // иначе длинные серии (> MAX_HISTORY_DAYS) сломаются при расчёте.
-      let streak=0;
-      const sorted=[...newHistory].sort();
-      if(sorted[sorted.length-1]===today()){
-        let cur=today();streak=1;
-        while(true){const d=new Date(cur);d.setDate(d.getDate()-1);const prev=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(sorted.includes(prev)){streak++;cur=prev;}else break;}
+    const ch=challenges.find(c=>c.id===id);
+    if(!ch) return;
+    // Уже отмечено в текущем периоде (день/неделя/месяц/год) — выходим
+    if(doneThisPeriod(ch.myHistory,ch.recurType)) return;
+
+    const newHistory=[...(ch.myHistory||[]),today()];
+    // Стрик считаем по периодам recurType, а не по календарным дням.
+    // Полный массив до обрезки — иначе длинные серии сломаются.
+    const streak=streakOf(newHistory,ch.recurType);
+    // Обрезаем историю перед сохранением (лимит документа Firestore).
+    const trimmedHistory=newHistory.length>MAX_HISTORY_DAYS
+      ? newHistory.slice(-MAX_HISTORY_DAYS)
+      : newHistory;
+
+    // 1. Оптимистичное локальное обновление — чистый апдейтер, без сайд-эффектов.
+    onUpdateCh(id,c=>({...c,myHistory:trimmedHistory,myStreak:streak}));
+
+    // 2. Синк с облаком + лента активности — один раз, вне апдейтера
+    //    (внутри setState сайд-эффекты опасны: React может вызвать апдейтер дважды).
+    if(ch.shareCode){
+      const ok=await cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,trimmedHistory,myTgId,userAvatar);
+      if(!ok){onUpdateCh(id,()=>ch);return;} // откат при ошибке
+      if(userKey){
+        cloudPublishActivity(userKey,{
+          id:uid(),challengeEmoji:ch.emoji,challengeTitle:ch.title,
+          streak,timestamp:Date.now(),reactions:{},
+        }).catch(()=>{});
       }
-      // Обрезаем до MAX_HISTORY_DAYS перед сохранением — и в облако, и в локальный стейт.
-      const trimmedHistory = newHistory.length > MAX_HISTORY_DAYS
-        ? newHistory.slice(-MAX_HISTORY_DAYS)
-        : newHistory;
-      // 2. Синкаем с облаком в фоне, не блокируя UI
-      if(ch.shareCode){
-        cloudUpdateMyProgress(ch.shareCode,myDisplayName,streak,trimmedHistory,myTgId,userAvatar)
-          .then(ok=>{
-            if(!ok&&prevCh) onUpdateCh(id,()=>prevCh); // 3. Откат при ошибке
-            // 4. Публикуем в ленту активности — только при успехе
-            if(ok && userKey) {
-              cloudPublishActivity(userKey, {
-                id: uid(),
-                challengeEmoji: ch.emoji,
-                challengeTitle: ch.title,
-                streak,
-                timestamp: Date.now(),
-                reactions: {},
-              }).catch(()=>{});
-            }
-          });
-      }
-      return {...ch,myHistory:trimmedHistory,myStreak:streak};
-    });
+    }
   };
 
   const joinCh=chData=>{
@@ -898,8 +950,21 @@ export default function SocialScreen({ challenges, sharedGoals, onUpdateCh, onUp
     else onCreateSg({...sgData,participants:[...new Set([...(sgData.participants||[]),myDisplayName])]});
   };
 
-  const toggleSgItem=(sgId,itemId)=>onUpdateSg(sgId,sg=>({...sg,items:sg.items.map(it=>it.id!==itemId?it:{...it,done:!it.done,doneBy:!it.done?myDisplayName:null})}));
-  const assignSgItem=(sgId,itemId,name)=>onUpdateSg(sgId,sg=>({...sg,items:sg.items.map(it=>it.id!==itemId?it:{...it,assignedTo:name})}));
+  // Цели: отметка/назначение пункта пишутся в облако (раньше были только
+  // локальными, поэтому совместная работа над целью не синхронизировалась).
+  const toggleSgItem=(sgId,itemId)=>{
+    const sg=sharedGoals.find(s=>s.id===sgId); if(!sg) return;
+    const it=sg.items.find(x=>x.id===itemId);
+    const willBeDone=!it?.done;
+    const doneBy=willBeDone?myDisplayName:null;
+    onUpdateSg(sgId,s=>({...s,items:s.items.map(x=>x.id!==itemId?x:{...x,done:willBeDone,doneBy})}));
+    if(sg.shareCode) cloudSetGoalItem(sg.shareCode,itemId,{done:willBeDone,doneBy}).catch(()=>{});
+  };
+  const assignSgItem=(sgId,itemId,name)=>{
+    const sg=sharedGoals.find(s=>s.id===sgId); if(!sg) return;
+    onUpdateSg(sgId,s=>({...s,items:s.items.map(x=>x.id!==itemId?x:{...x,assignedTo:name})}));
+    if(sg.shareCode) cloudSetGoalItem(sg.shareCode,itemId,{assignedTo:name}).catch(()=>{});
+  };
 
 
   return (
