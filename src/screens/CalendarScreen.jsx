@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { T } from "../theme.js";
 import { MONTHS_RU, WDAYS, EVENT_TYPES } from "../constants.js";
 import { today, fmtDate } from "../utils";
@@ -14,7 +14,7 @@ const isDateInTaskPeriod = (task, selDate) => {
 };
 
 // ─── CALENDAR GRID ────────────────────────────────────────────────
-function CalendarGrid({ year, month, events, tasks, selectedDate, onSelect }) {
+function CalendarGrid({ year, month, events, tasks, selectedDate, onSelect, searchDays }) {
   const first=new Date(year,month,1);
   const last=new Date(year,month+1,0);
   const startDow=(first.getDay()+6)%7;
@@ -50,11 +50,12 @@ function CalendarGrid({ year, month, events, tasks, selectedDate, onSelect }) {
           if(!day) return <div key={`e${i}`}/>;
           const isToday=isThisMonth&&day===tD;
           const isSel=selSame&&day===selDay;
+          const isMatch=searchDays&&searchDays.has(day);
           const evs=evMap[day]||[];
           const colors=[...new Set(evs.slice(0,3).map(e=>e.color))];
           const hasBd=evs.some(e=>e.isBirthday);
           return (
-            <div key={day} onClick={()=>onSelect(`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`)} style={{aspectRatio:"1",borderRadius:8,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:isSel?T.purp:isToday?T.bg3:"transparent",border:isToday&&!isSel?`1.5px solid ${T.purp}`:"1.5px solid transparent",transition:"all 0.15s",padding:"2px 0"}}>
+            <div key={day} onClick={()=>onSelect(`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`)} style={{aspectRatio:"1",borderRadius:8,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:isSel?T.purp:isToday?T.bg3:"transparent",border:isSel?"1.5px solid transparent":isMatch?`1.5px solid ${T.gold}`:isToday?`1.5px solid ${T.purp}`:"1.5px solid transparent",boxShadow:isMatch&&!isSel?`0 0 8px ${T.gold}66`:undefined,transition:"all 0.15s",padding:"2px 0"}}>
               <span style={{fontSize:12,fontWeight:isToday?800:400,lineHeight:1,color:isSel?"#fff":isToday?T.purpL:hasBd?T.gold:T.text}}>{day}</span>
               <div style={{display:"flex",gap:2,marginTop:2}}>
                 {colors.map((c,ci)=><div key={ci} style={{width:4,height:4,borderRadius:"50%",background:c}}/>)}
@@ -68,6 +69,52 @@ function CalendarGrid({ year, month, events, tasks, selectedDate, onSelect }) {
   );
 }
 
+// ─── SEARCH RESULTS ───────────────────────────────────────────────
+// Список дат, в которые были выполнены задачи, подходящие под запрос.
+// Группировка по дате (новые сверху). Тап → переход к этому дню.
+function SearchResults({ results, totalHits, query, onPick }) {
+  if (totalHits === 0) {
+    return (
+      <div style={{textAlign:"center",padding:"30px 0",color:T.dim}}>
+        <div style={{fontSize:36,marginBottom:8}}>🔍</div>
+        <div style={{fontSize:14,color:T.sub}}>Ничего не найдено по «{query}»</div>
+        <div style={{fontSize:12,marginTop:6}}>Ищутся только выполненные квесты</div>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div style={{fontSize:13,fontWeight:700,color:T.text,marginBottom:12}}>
+        🔍 Найдено выполнений: {totalHits} · дней: {results.length}
+      </div>
+      {results.map(r=>{
+        const wd=WDAYS[(new Date(r.date).getDay()+6)%7];
+        return (
+          <div key={r.date} style={{marginBottom:14}}>
+            <div onClick={()=>onPick(r.date)} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:6}}>
+              <div style={{fontSize:13,fontWeight:800,color:T.purpL}}>{wd}, {fmtDate(r.date)}</div>
+              <div style={{flex:1,height:1,background:T.brd}}/>
+              <div style={{fontSize:11,color:T.sub,flexShrink:0}}>в календарь →</div>
+            </div>
+            {r.items.map(it=>(
+              <div key={it.id+it.title} onClick={()=>onPick(r.date)} style={{background:T.bg2,border:`1px solid ${T.brd}`,borderRadius:11,padding:"10px 14px",marginBottom:6,display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"opacity 0.15s"}}
+                onMouseEnter={e=>e.currentTarget.style.opacity="0.8"}
+                onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                <div style={{width:22,height:22,borderRadius:"50%",background:T.teal+"44",border:`2px solid ${T.teal}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>✓</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.title}</div>
+                  <div style={{fontSize:11,marginTop:2,fontWeight:700,color:T.teal}}>✓ +{it.xp} XP</div>
+                </div>
+                <PeriodBadge period={it.period} small/>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 // ─── CALENDAR SCREEN ──────────────────────────────────────────────
 export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent, onDeleteEvent, onSaveTask, onDeleteTask }) {
   const now=new Date();
@@ -77,6 +124,7 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
   const [showModal,setModal]=useState(false);
   const [editEvent,setEditEvent]=useState(null);
   const [editTask,setEditTask]=useState(null);  // ← для редактирования задач
+  const [query,setQuery]=useState("");           // ← поиск выполненных квестов
 
   const prev=()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);};
   const next=()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);};
@@ -114,6 +162,48 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
     return t;
   }).sort((a,b)=>Number(a.done)-Number(b.done));
 
+  // ─── ПОИСК ВЫПОЛНЕННЫХ КВЕСТОВ ──────────────────────────────────
+  // Источник правды — doneHistory всех задач (включая все экземпляры
+  // повторяющихся квестов). Собираем все даты, в которые выполнялась
+  // задача с подходящим названием, и группируем по дате.
+  const q = query.trim().toLowerCase();
+  const searchActive = q.length > 0;
+
+  const searchResults = useMemo(() => {
+    if (!searchActive) return [];
+    const byDate = {};
+    tasks.forEach(t => {
+      if (!t.title || !t.title.toLowerCase().includes(q)) return;
+      (t.doneHistory || []).forEach(d => {
+        if (!byDate[d]) byDate[d] = [];
+        // не дублируем одинаковые названия в пределах одного дня
+        if (!byDate[d].some(x => x.title === t.title))
+          byDate[d].push({ id: t.id, title: t.title, xp: t.xp, period: t.period });
+      });
+    });
+    return Object.keys(byDate)
+      .sort((a, b) => b.localeCompare(a)) // новые сверху
+      .map(date => ({ date, items: byDate[date] }));
+  }, [tasks, q, searchActive]);
+
+  const totalHits = searchResults.reduce((n, r) => n + r.items.length, 0);
+
+  // Дни текущего месяца сетки, попавшие в результаты — для подсветки.
+  const searchDays = useMemo(() => {
+    const set = new Set();
+    searchResults.forEach(r => {
+      const [y, m, d] = r.date.split("-").map(Number);
+      if (y === year && m === month + 1) set.add(d);
+    });
+    return set;
+  }, [searchResults, year, month]);
+
+  // Переход к конкретному дню из результата поиска.
+  const goToDate = iso => {
+    const [y, m] = iso.split("-").map(Number);
+    setYear(y); setMonth(m - 1); setSel(iso); setQuery("");
+  };
+
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{height:"calc(10px + env(safe-area-inset-top,0px))",background:T.bg1,flexShrink:0}}/>
@@ -123,12 +213,24 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
         <div onClick={next} style={{width:32,height:32,borderRadius:"50%",background:T.bg2,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:T.sub}}>›</div>
       </div>
 
+      <div style={{padding:"6px 12px 4px",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,background:T.bg0,border:`1px solid ${searchActive?T.purp:T.brd}`,borderRadius:11,padding:"9px 12px",transition:"border-color 0.15s"}}>
+          <span style={{fontSize:14,color:T.sub,flexShrink:0}}>🔍</span>
+          <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Поиск выполненных квестов…"
+            style={{flex:1,background:"transparent",border:"none",outline:"none",color:T.text,fontSize:14,minWidth:0,colorScheme:T.cs}}/>
+          {searchActive&&<span onClick={()=>setQuery("")} style={{fontSize:18,color:T.sub,cursor:"pointer",flexShrink:0,lineHeight:1}}>×</span>}
+        </div>
+      </div>
+
       <div style={{padding:"8px 12px 6px",flexShrink:0}}>
-        <CalendarGrid year={year} month={month} events={events} tasks={tasks} selectedDate={selDate} onSelect={setSel}/>
+        <CalendarGrid year={year} month={month} events={events} tasks={tasks} selectedDate={selDate} onSelect={setSel} searchDays={searchActive?searchDays:null}/>
       </div>
       <div style={{height:1,background:T.brd}}/>
 
       <div style={{flex:1,overflowY:"auto",padding:"12px 16px",WebkitOverflowScrolling:"touch"}}>
+        {searchActive ? (
+          <SearchResults results={searchResults} totalHits={totalHits} query={query.trim()} onPick={goToDate}/>
+        ) : (<>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
           <div style={{fontSize:14,fontWeight:700,color:T.text}}>{selDate===today()?"📅 Сегодня":`📅 ${fmtDate(selDate)}`}</div>
           <div onClick={()=>setModal(true)} style={{padding:"6px 14px",borderRadius:20,cursor:"pointer",fontSize:12,fontWeight:700,background:T.teal+"22",color:T.teal,border:`1px solid ${T.teal}55`}}>+ Событие</div>
@@ -171,6 +273,7 @@ export default function CalendarScreen({ events, tasks, onAddEvent, onEditEvent,
             ))}
           </>
         )}
+        </>)}
         <div style={{height:20}}/>
       </div>
       {showModal&&<EventModal onClose={()=>setModal(false)} onCreate={onAddEvent} defaultDate={selDate}/>}
